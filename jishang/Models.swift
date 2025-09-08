@@ -11,12 +11,12 @@ import SwiftUI
 // MARK: - Currency Formatting Extension
 extension Double {
     var currencyFormatted: String {
-        return "¥\(self, specifier: "%.2f")"
+        return String(format: "¥%.2f", self)
     }
     
     var currencyFormattedWithSign: String {
         let sign = self >= 0 ? "+" : "-"
-        return "\(sign)¥\(abs(self), specifier: "%.2f")"
+        return String(format: "%@¥%.2f", sign, abs(self))
     }
 }
 
