@@ -90,7 +90,7 @@ struct CategoryFilterView: View {
                                 title: filter.displayName,
                                 isSelected: selectedFilter == filter
                             ) {
-                                selectedFilter = filter
+                                handleSubFilterSelection(filter)
                             }
                         }
                     }
@@ -130,6 +130,23 @@ struct CategoryFilterView: View {
             withAnimation(.easeInOut(duration: 0.3)) {
                 isExpanded = true
             }
+        }
+    }
+    
+    private func handleSubFilterSelection(_ filter: FilterType) {
+        if selectedFilter == filter {
+            // 如果已选中，则取消选中，回到主类型筛选
+            switch selectedMainType {
+            case .income:
+                selectedFilter = .byTransactionType(.income)
+            case .expense:
+                selectedFilter = .byTransactionType(.expense)
+            case .all:
+                selectedFilter = .all
+            }
+        } else {
+            // 如果未选中，则选中这个filter
+            selectedFilter = filter
         }
     }
     

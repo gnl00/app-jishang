@@ -21,13 +21,13 @@ struct ActionButtonView: View {
                 .fill(Color.clear)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(borderColor, lineWidth: 2)
+                        .stroke(borderColor.opacity(0.3), lineWidth: 2)
                 )
                 .overlay(
                     VStack(spacing: 12) {
                         Image(systemName: icon)
                             .font(.system(size: 24, weight: .medium))
-                            .foregroundColor(iconColor)
+                            .foregroundColor(iconColor.opacity(0.5))
                         
                         Text(title)
                             .font(.system(size: 16, weight: .semibold))
