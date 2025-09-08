@@ -10,7 +10,7 @@ import SwiftUI
 struct AddTransactionView: View {
     @ObservedObject var store: TransactionStore
     @Binding var isPresented: Bool
-    @State var transactionType: TransactionType
+    let transactionType: TransactionType
     
     @State private var amount: String = ""
     @State private var selectedCategory: Category?

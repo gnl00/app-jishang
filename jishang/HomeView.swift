@@ -10,8 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject var transactionStore: TransactionStore
     @State private var selectedFilter: FilterType = .all
-    @State private var showAddTransaction = false
-    @State private var transactionType: TransactionType = .expense
+    @State private var presentedTransactionType: TransactionType?
     
     var body: some View {
         NavigationView {
@@ -20,12 +19,10 @@ struct HomeView: View {
                 VStack(spacing: 16) {
                     SummaryCardsView(
                         onExpenseAction: {
-                            transactionType = .expense
-                            showAddTransaction = true
+                            presentedTransactionType = .expense
                         },
                         onIncomeAction: {
-                            transactionType = .income
-                            showAddTransaction = true
+                            presentedTransactionType = .income
                         }
                     )
                     
@@ -53,11 +50,14 @@ struct HomeView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("记账本")
             .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showAddTransaction) {
+            .sheet(item: $presentedTransactionType) { type in
                 AddTransactionView(
                     store: transactionStore,
-                    isPresented: $showAddTransaction,
-                    transactionType: transactionType
+                    isPresented: Binding(
+                        get: { presentedTransactionType != nil },
+                        set: { if !$0 { presentedTransactionType = nil } }
+                    ),
+                    transactionType: type
                 )
             }
         }

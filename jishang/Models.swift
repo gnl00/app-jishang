@@ -8,9 +8,11 @@
 import Foundation
 import SwiftUI
 
-enum TransactionType: String, CaseIterable, Codable {
+enum TransactionType: String, CaseIterable, Codable, Identifiable {
     case income = "income"
     case expense = "expense"
+    
+    var id: String { rawValue }
     
     var color: Color {
         switch self {
