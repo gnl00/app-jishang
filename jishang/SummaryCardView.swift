@@ -57,21 +57,21 @@ struct SummaryCardsView: View {
     var body: some View {
         HStack(spacing: 12) {
             ActionButtonView(
-                title: "记支出",
-                icon: "minus.circle.fill",
-                borderColor: .red,
-                iconColor: .red,
-                textColor: .primary,
-                action: onExpenseAction
-            )
-            
-            ActionButtonView(
                 title: "记收入",
                 icon: "plus.circle.fill",
                 borderColor: .blue,
                 iconColor: .blue,
                 textColor: .primary,
                 action: onIncomeAction
+            )
+
+            ActionButtonView(
+                title: "记支出",
+                icon: "minus.circle.fill",
+                borderColor: .red,
+                iconColor: .red,
+                textColor: .primary,
+                action: onExpenseAction
             )
         }
         .padding(.horizontal)
