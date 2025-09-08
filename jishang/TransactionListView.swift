@@ -64,7 +64,7 @@ struct TransactionRowView: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(transaction.type == .income ? "+" : "-")¥\(transaction.amount, specifier: "%.2f")")
+                Text("\(transaction.type == .income ? "+" : "-")\(transaction.amount.currencyFormatted)")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundColor(transaction.type == .income ? .green : .red)
                 

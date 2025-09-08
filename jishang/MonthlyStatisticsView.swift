@@ -82,7 +82,7 @@ struct StatisticSection: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.secondary)
             
-            Text("¥\(amount, specifier: "%.0f")")
+            Text(amount.currencyFormatted)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(textColor)
         }
@@ -105,7 +105,7 @@ struct BalanceSection: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.secondary)
             
-            Text("¥\(amount, specifier: "%.0f")")
+            Text(amount.currencyFormatted)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(textColor)
         }

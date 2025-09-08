@@ -8,6 +8,18 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Currency Formatting Extension
+extension Double {
+    var currencyFormatted: String {
+        return "¥\(self, specifier: "%.2f")"
+    }
+    
+    var currencyFormattedWithSign: String {
+        let sign = self >= 0 ? "+" : "-"
+        return "\(sign)¥\(abs(self), specifier: "%.2f")"
+    }
+}
+
 enum TransactionType: String, CaseIterable, Codable, Identifiable {
     case income = "income"
     case expense = "expense"

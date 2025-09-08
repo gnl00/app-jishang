@@ -59,7 +59,7 @@ struct StatisticCard: View {
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
                 
-                Text("¥\(amount, specifier: "%.2f")")
+                Text(amount.currencyFormatted)
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(color)
             }
@@ -123,7 +123,7 @@ struct CategoryRowView: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
-                Text("¥\(amount, specifier: "%.2f")")
+                Text(amount.currencyFormatted)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.red)
                 
