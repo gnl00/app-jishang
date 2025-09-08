@@ -9,17 +9,12 @@ import SwiftUI
 
 struct TransactionListView: View {
     @ObservedObject var store: TransactionStore
-    let selectedFilter: FilterCategory
+    let selectedFilter: FilterType
     
     private var filteredTransactions: [Transaction] {
-        switch selectedFilter {
-        case .all:
-            return store.transactions.sorted { $0.date > $1.date }
-        case .income:
-            return store.transactions.filter { $0.type == .income }.sorted { $0.date > $1.date }
-        case .expense:
-            return store.transactions.filter { $0.type == .expense }.sorted { $0.date > $1.date }
-        }
+        return store.transactions
+            .filter { selectedFilter.matches(transaction: $0) }
+            .sorted { $0.date > $1.date }
     }
     
     var body: some View {

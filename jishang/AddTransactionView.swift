@@ -13,23 +13,25 @@ struct AddTransactionView: View {
     @State var transactionType: TransactionType
     
     @State private var amount: String = ""
-    @State private var selectedCategory: Category = .food
+    @State private var selectedCategory: Category?
     @State private var note: String = ""
     @State private var date = Date()
+    @State private var showAddCategory = false
     @FocusState private var isAmountFocused: Bool
     
     private var filteredCategories: [Category] {
-        Category.allCases.filter { category in
+        store.allCategories.filter { category in
             if transactionType == .income {
-                return [.salary, .bonus, .investment, .other].contains(category)
+                return category.defaultType == .income || category.isCustom
             } else {
-                return ![.salary, .bonus, .investment].contains(category)
+                return category.defaultType == .expense || category.isCustom
             }
         }
     }
     
     private var isValidInput: Bool {
-        guard let amountValue = Double(amount), amountValue > 0 else {
+        guard let amountValue = Double(amount), amountValue > 0,
+              let _ = selectedCategory else {
             return false
         }
         return true
@@ -81,13 +83,37 @@ struct AddTransactionView: View {
                             .foregroundColor(.secondary)
                         
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
-                            ForEach(filteredCategories, id: \.self) { category in
+                            ForEach(filteredCategories, id: \.id) { category in
                                 CategoryButton(
                                     category: category,
-                                    isSelected: selectedCategory == category
+                                    isSelected: selectedCategory?.id == category.id
                                 ) {
                                     selectedCategory = category
                                 }
+                            }
+                            
+                            // 添加类别按钮
+                            Button(action: {
+                                showAddCategory = true
+                            }) {
+                                VStack(spacing: 4) {
+                                    Image(systemName: "plus.circle")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(.blue)
+                                    
+                                    Text("添加")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.blue)
+                                        .lineLimit(1)
+                                }
+                                .frame(height: 60)
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                                )
                             }
                         }
                     }
@@ -148,18 +174,29 @@ struct AddTransactionView: View {
             .padding()
             .navigationBarHidden(true)
         }
+        .sheet(isPresented: $showAddCategory) {
+            AddCategoryView(
+                store: store,
+                isPresented: $showAddCategory,
+                transactionType: transactionType,
+                selectedCategory: $selectedCategory
+            )
+        }
         .onAppear {
-            selectedCategory = filteredCategories.first ?? .food
+            if selectedCategory == nil {
+                selectedCategory = filteredCategories.first
+            }
             isAmountFocused = true
         }
     }
     
     private func saveTransaction() {
-        guard let amountValue = Double(amount), amountValue > 0 else { return }
+        guard let amountValue = Double(amount), amountValue > 0,
+              let category = selectedCategory else { return }
         
         let transaction = Transaction(
             amount: amountValue,
-            category: selectedCategory,
+            category: category,
             type: transactionType,
             date: date,
             note: note

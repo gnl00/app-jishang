@@ -9,7 +9,7 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject var transactionStore: TransactionStore
-    @State private var selectedFilter: FilterCategory = .all
+    @State private var selectedFilter: FilterType = .all
     @State private var showAddTransaction = false
     @State private var transactionType: TransactionType = .expense
     
@@ -35,7 +35,7 @@ struct HomeView: View {
                 .padding(.top)
                 
                 // Category filter tab bar
-                CategoryFilterView(selectedFilter: $selectedFilter)
+                CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
                     .padding(.vertical, 8)
                 
                 // Transaction list

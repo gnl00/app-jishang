@@ -22,43 +22,51 @@ enum TransactionType: String, CaseIterable, Codable {
     }
 }
 
-enum Category: String, CaseIterable, Codable {
-    case food = "餐饮"
-    case transport = "交通"
-    case shopping = "购物"
-    case entertainment = "娱乐"
-    case healthcare = "医疗"
-    case education = "教育"
-    case housing = "住房"
-    case salary = "工资"
-    case bonus = "奖金"
-    case investment = "投资"
-    case other = "其他"
+struct Category: Identifiable, Codable, Hashable {
+    let id: UUID
+    let name: String
+    let icon: String
+    let defaultType: TransactionType
+    let isCustom: Bool
     
-    var icon: String {
-        switch self {
-        case .food: return "🍽️"
-        case .transport: return "🚗"
-        case .shopping: return "🛍️"
-        case .entertainment: return "🎬"
-        case .healthcare: return "🏥"
-        case .education: return "📚"
-        case .housing: return "🏠"
-        case .salary: return "💼"
-        case .bonus: return "🎁"
-        case .investment: return "📈"
-        case .other: return "📝"
-        }
+    init(id: UUID = UUID(), name: String, icon: String, defaultType: TransactionType, isCustom: Bool = false) {
+        self.id = id
+        self.name = name
+        self.icon = icon
+        self.defaultType = defaultType
+        self.isCustom = isCustom
     }
     
-    var defaultType: TransactionType {
-        switch self {
-        case .salary, .bonus, .investment:
-            return .income
-        default:
-            return .expense
-        }
+    var rawValue: String {
+        return name
     }
+    
+    static let predefinedCategories: [Category] = [
+        Category(name: "餐饮", icon: "🍽️", defaultType: .expense),
+        Category(name: "交通", icon: "🚗", defaultType: .expense),
+        Category(name: "购物", icon: "🛍️", defaultType: .expense),
+        Category(name: "娱乐", icon: "🎬", defaultType: .expense),
+        Category(name: "医疗", icon: "🏥", defaultType: .expense),
+        Category(name: "教育", icon: "📚", defaultType: .expense),
+        Category(name: "住房", icon: "🏠", defaultType: .expense),
+        Category(name: "工资", icon: "💼", defaultType: .income),
+        Category(name: "奖金", icon: "🎁", defaultType: .income),
+        Category(name: "投资", icon: "📈", defaultType: .income),
+        Category(name: "其他", icon: "📝", defaultType: .expense)
+    ]
+    
+    // 为了保持向后兼容性，提供一些便捷的静态属性
+    static let food = predefinedCategories[0]
+    static let transport = predefinedCategories[1]
+    static let shopping = predefinedCategories[2]
+    static let entertainment = predefinedCategories[3]
+    static let healthcare = predefinedCategories[4]
+    static let education = predefinedCategories[5]
+    static let housing = predefinedCategories[6]
+    static let salary = predefinedCategories[7]
+    static let bonus = predefinedCategories[8]
+    static let investment = predefinedCategories[9]
+    static let other = predefinedCategories[10]
 }
 
 struct Transaction: Identifiable, Codable {
@@ -79,17 +87,78 @@ struct Transaction: Identifiable, Codable {
     }
 }
 
-enum FilterCategory: String, CaseIterable {
-    case all = "全部"
-    case income = "收入"
-    case expense = "支出"
+enum FilterType: Equatable {
+    case all
+    case byTransactionType(TransactionType)
+    case byCategory(Category)
+    
+    var displayName: String {
+        switch self {
+        case .all:
+            return "全部"
+        case .byTransactionType(let type):
+            return type == .income ? "收入" : "支出"
+        case .byCategory(let category):
+            return category.rawValue
+        }
+    }
+    
+    static var predefinedFilters: [FilterType] {
+        return [
+            .all,
+            .byTransactionType(.income),
+            .byTransactionType(.expense)
+        ]
+    }
+    
+    static func categoryFilters(from categories: [Category]) -> [FilterType] {
+        return categories.map { .byCategory($0) }
+    }
+    
+    static func allFilters(from categories: [Category]) -> [FilterType] {
+        return predefinedFilters + categoryFilters(from: categories)
+    }
+    
+    func matches(transaction: Transaction) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .byTransactionType(let type):
+            return transaction.type == type
+        case .byCategory(let category):
+            return transaction.category == category
+        }
+    }
 }
 
 class TransactionStore: ObservableObject {
     @Published var transactions: [Transaction] = []
+    @Published var customCategories: [Category] = []
+    
+    var allCategories: [Category] {
+        return Category.predefinedCategories + customCategories
+    }
+    
+    var allFilters: [FilterType] {
+        return FilterType.allFilters(from: allCategories)
+    }
     
     init() {
         loadSampleData()
+    }
+    
+    func addCustomCategory(name: String, icon: String, defaultType: TransactionType) {
+        let newCategory = Category(
+            name: name,
+            icon: icon,
+            defaultType: defaultType,
+            isCustom: true
+        )
+        customCategories.append(newCategory)
+    }
+    
+    func removeCustomCategory(_ category: Category) {
+        customCategories.removeAll { $0.id == category.id }
     }
     
     private func loadSampleData() {

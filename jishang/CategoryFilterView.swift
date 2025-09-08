@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct CategoryFilterView: View {
-    @Binding var selectedFilter: FilterCategory
+    @ObservedObject var store: TransactionStore
+    @Binding var selectedFilter: FilterType
     
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(FilterCategory.allCases, id: \.self) { filter in
+                ForEach(Array(store.allFilters.enumerated()), id: \.offset) { index, filter in
                     FilterButton(
-                        title: filter.rawValue,
+                        title: filter.displayName,
                         isSelected: selectedFilter == filter
                     ) {
                         selectedFilter = filter
@@ -50,5 +51,5 @@ struct FilterButton: View {
 }
 
 #Preview {
-    CategoryFilterView(selectedFilter: .constant(.all))
+    CategoryFilterView(store: TransactionStore(), selectedFilter: .constant(.all))
 }
