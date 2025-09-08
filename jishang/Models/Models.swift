@@ -181,11 +181,15 @@ class TransactionStore: ObservableObject {
         
         transactions = [
             Transaction(amount: 5000, category: .salary, type: .income, date: calendar.date(byAdding: .day, value: -1, to: today)!, note: "月薪"),
+            Transaction(amount: 1000, category: .bonus, type: .income, date: calendar.date(byAdding: .day, value: -5, to: today)!, note: "绩效奖金"),
+            Transaction(amount: 2500, category: .investment, type: .income, date: calendar.date(byAdding: .day, value: -10, to: today)!, note: "股票收益"),
+            Transaction(amount: 800, category: .other, type: .income, date: calendar.date(byAdding: .day, value: -15, to: today)!, note: "兼职收入"),
             Transaction(amount: 35.5, category: .food, type: .expense, date: calendar.date(byAdding: .day, value: -1, to: today)!, note: "午餐"),
             Transaction(amount: 120, category: .transport, type: .expense, date: calendar.date(byAdding: .day, value: -2, to: today)!, note: "打车费"),
             Transaction(amount: 299, category: .shopping, type: .expense, date: calendar.date(byAdding: .day, value: -3, to: today)!, note: "购买衣服"),
-            Transaction(amount: 1000, category: .bonus, type: .income, date: calendar.date(byAdding: .day, value: -5, to: today)!, note: "绩效奖金"),
-            Transaction(amount: 88, category: .entertainment, type: .expense, date: calendar.date(byAdding: .day, value: -7, to: today)!, note: "电影票")
+            Transaction(amount: 88, category: .entertainment, type: .expense, date: calendar.date(byAdding: .day, value: -7, to: today)!, note: "电影票"),
+            Transaction(amount: 450, category: .healthcare, type: .expense, date: calendar.date(byAdding: .day, value: -12, to: today)!, note: "体检费用"),
+            Transaction(amount: 1200, category: .housing, type: .expense, date: calendar.date(byAdding: .day, value: -20, to: today)!, note: "房租")
         ]
     }
     
