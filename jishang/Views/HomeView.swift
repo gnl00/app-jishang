@@ -46,15 +46,10 @@ struct HomeView: View {
                     .padding(.vertical, 8)
                 
                 // Transaction list
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        TransactionListView(
-                            store: transactionStore,
-                            selectedFilter: selectedFilter
-                        )
-                    }
-                    .padding(.top, 8)
-                }
+                TransactionListView(
+                    store: transactionStore,
+                    selectedFilter: selectedFilter
+                )
                 .background(Color(.systemGroupedBackground))
             }
             .background(Color(.systemGroupedBackground))

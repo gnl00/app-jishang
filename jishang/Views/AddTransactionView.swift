@@ -11,6 +11,7 @@ struct AddTransactionView: View {
     @ObservedObject var store: TransactionStore
     @Binding var isPresented: Bool
     let transactionType: TransactionType
+    let editingTransaction: Transaction? // 新增：可选的编辑交易
     
     @State private var amount: String = ""
     @State private var selectedCategory: Category?
@@ -18,6 +19,13 @@ struct AddTransactionView: View {
     @State private var date = Date()
     @State private var showAddCategory = false
     @FocusState private var isAmountFocused: Bool
+    
+    init(store: TransactionStore, isPresented: Binding<Bool>, transactionType: TransactionType, editingTransaction: Transaction? = nil) {
+        self.store = store
+        self._isPresented = isPresented
+        self.transactionType = transactionType
+        self.editingTransaction = editingTransaction
+    }
     
     private var filteredCategories: [Category] {
         store.allCategories.filter { category in
@@ -37,6 +45,10 @@ struct AddTransactionView: View {
         return true
     }
     
+    private var isEditing: Bool {
+        return editingTransaction != nil
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 24) {
@@ -46,7 +58,7 @@ struct AddTransactionView: View {
                         .font(.system(size: 24))
                         .foregroundColor(transactionType == .income ? .blue : .red)
                     
-                    Text(transactionType == .income ? "添加收入" : "添加支出")
+                    Text(isEditing ? (transactionType == .income ? "编辑收入" : "编辑支出") : (transactionType == .income ? "添加收入" : "添加支出"))
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.primary)
                     
@@ -158,7 +170,7 @@ struct AddTransactionView: View {
                     .background(Color(.systemGray5))
                     .cornerRadius(12)
                     
-                    Button("保存") {
+                    Button(isEditing ? "更新" : "保存") {
                         saveTransaction()
                     }
                     .font(.system(size: 16, weight: .semibold))
@@ -183,10 +195,19 @@ struct AddTransactionView: View {
             )
         }
         .onAppear {
-            if selectedCategory == nil {
-                selectedCategory = filteredCategories.first
+            if let editing = editingTransaction {
+                // 编辑模式：预填充数据
+                amount = String(editing.amount)
+                selectedCategory = editing.category
+                note = editing.note
+                date = editing.date
+            } else {
+                // 新增模式：设置默认分类
+                if selectedCategory == nil {
+                    selectedCategory = filteredCategories.first
+                }
+                isAmountFocused = true
             }
-            isAmountFocused = true
         }
     }
     
@@ -194,15 +215,27 @@ struct AddTransactionView: View {
         guard let amountValue = Double(amount), amountValue > 0,
               let category = selectedCategory else { return }
         
-        let transaction = Transaction(
-            amount: amountValue,
-            category: category,
-            type: transactionType,
-            date: date,
-            note: note
-        )
+        if let editing = editingTransaction {
+            // 编辑模式：更新现有交易
+            var updatedTransaction = editing
+            updatedTransaction.amount = amountValue
+            updatedTransaction.category = category
+            updatedTransaction.note = note
+            updatedTransaction.date = date
+            // 注意：保持原有的id和type不变
+            store.updateTransaction(updatedTransaction)
+        } else {
+            // 新增模式：创建新交易
+            let transaction = Transaction(
+                amount: amountValue,
+                category: category,
+                type: transactionType,
+                date: date,
+                note: note
+            )
+            store.addTransaction(transaction)
+        }
         
-        store.addTransaction(transaction)
         isPresented = false
     }
 }

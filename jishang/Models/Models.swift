@@ -197,6 +197,12 @@ class TransactionStore: ObservableObject {
         transactions.append(transaction)
     }
     
+    func updateTransaction(_ transaction: Transaction) {
+        if let index = transactions.firstIndex(where: { $0.id == transaction.id }) {
+            transactions[index] = transaction
+        }
+    }
+    
     func deleteTransaction(_ transaction: Transaction) {
         transactions.removeAll { $0.id == transaction.id }
     }

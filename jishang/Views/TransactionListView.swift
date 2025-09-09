@@ -11,6 +11,9 @@ struct TransactionListView: View {
     @ObservedObject var store: TransactionStore
     let selectedFilter: FilterType
     
+    @State private var editingTransaction: Transaction?
+    @State private var showEditView = false
+    
     private var filteredTransactions: [Transaction] {
         return store.transactions
             .filter { selectedFilter.matches(transaction: $0) }
@@ -18,15 +21,32 @@ struct TransactionListView: View {
     }
     
     var body: some View {
-        LazyVStack(spacing: 1) {
-            ForEach(filteredTransactions) { transaction in
-                TransactionRowView(transaction: transaction)
-                    .onTapGesture {
-                        // Handle transaction tap
+        List(filteredTransactions) { transaction in
+            TransactionRowView(transaction: transaction)
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button("删除", role: .destructive) {
+                        store.deleteTransaction(transaction)
                     }
+                }
+                .swipeActions(edge: .leading) {
+                    Button("编辑") {
+                        editingTransaction = transaction
+                        showEditView = true
+                    }
+                    .tint(.blue)
+                }
+        }
+        .listStyle(.plain)
+        .sheet(isPresented: $showEditView) {
+            if let transaction = editingTransaction {
+                AddTransactionView(
+                    store: store,
+                    isPresented: $showEditView,
+                    transactionType: transaction.type,
+                    editingTransaction: transaction
+                )
             }
         }
-        .padding(.horizontal)
     }
 }
 
@@ -73,14 +93,11 @@ struct TransactionRowView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(8)
-        .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
+        .padding(.vertical, 4)
     }
 }
 
 #Preview {
     let store = TransactionStore()
-    TransactionListView(store: store, selectedFilter: .all)
+    return TransactionListView(store: store, selectedFilter: .all)
 }
