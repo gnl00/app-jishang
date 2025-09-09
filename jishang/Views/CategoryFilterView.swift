@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Pow
 
 enum MainFilterType: String, CaseIterable {
     case all = "全部"
@@ -19,6 +20,9 @@ struct CategoryFilterView: View {
     
     @State private var isExpanded = false
     @State private var selectedMainType: MainFilterType = .all
+    @State private var lastSelectedFilter: FilterType = .all
+    @Namespace private var mainButtonNamespace
+    @Namespace private var subButtonNamespace
     
     private var mainFilters: [FilterType] {
         return [
@@ -54,9 +58,12 @@ struct CategoryFilterView: View {
                         ForEach(MainFilterType.allCases, id: \.self) { mainType in
                             MainFilterButton(
                                 title: mainType.rawValue,
-                                isSelected: selectedMainType == mainType
+                                isSelected: selectedMainType == mainType,
+                                namespace: mainButtonNamespace
                             ) {
-                                handleMainTypeSelection(mainType)
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    handleMainTypeSelection(mainType)
+                                }
                             }
                         }
                     }
@@ -88,9 +95,12 @@ struct CategoryFilterView: View {
                         ForEach(Array(subcategoryFilters.enumerated()), id: \.offset) { index, filter in
                             SubFilterButton(
                                 title: filter.displayName,
-                                isSelected: selectedFilter == filter
+                                isSelected: selectedFilter == filter,
+                                namespace: subButtonNamespace
                             ) {
-                                handleSubFilterSelection(filter)
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    handleSubFilterSelection(filter)
+                                }
                             }
                         }
                     }
@@ -104,9 +114,14 @@ struct CategoryFilterView: View {
         }
         .padding(.vertical, 8)
         .onChange(of: selectedFilter) { newFilter in
-            updateMainTypeFromFilter(newFilter)
+            // 防止重复触发
+            if newFilter != lastSelectedFilter {
+                lastSelectedFilter = newFilter
+                updateMainTypeFromFilter(newFilter)
+            }
         }
         .onAppear {
+            lastSelectedFilter = selectedFilter
             updateMainTypeFromFilter(selectedFilter)
         }
     }
@@ -181,6 +196,7 @@ struct CategoryFilterView: View {
 struct MainFilterButton: View {
     let title: String
     let isSelected: Bool
+    let namespace: Namespace.ID
     let action: () -> Void
     
     var body: some View {
@@ -191,17 +207,26 @@ struct MainFilterButton: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(isSelected ? Color.primary : Color(.systemGray6))
+                    ZStack {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.primary)
+                                .matchedGeometryEffect(id: "mainBackground", in: namespace)
+                        } else {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color(.systemGray6))
+                        }
+                    }
                 )
         }
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .changeEffect(.wiggle, value: isSelected)
     }
 }
 
 struct SubFilterButton: View {
     let title: String
     let isSelected: Bool
+    let namespace: Namespace.ID
     let action: () -> Void
     
     var body: some View {
@@ -212,11 +237,19 @@ struct SubFilterButton: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(isSelected ? Color(UIColor.systemFill.withAlphaComponent(0.8)) : Color(.systemGray5))
+                    ZStack {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(UIColor.systemFill.withAlphaComponent(0.8)))
+                                .matchedGeometryEffect(id: "subBackground", in: namespace)
+                        } else {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.systemGray5))
+                        }
+                    }
                 )
         }
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .changeEffect(.wiggle, value: isSelected)
     }
 }
 
