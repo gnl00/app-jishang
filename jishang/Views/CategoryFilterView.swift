@@ -112,6 +112,16 @@ struct CategoryFilterView: View {
     }
     
     private func handleMainTypeSelection(_ mainType: MainFilterType) {
+        // 如果已选中相同类型，则取消选中回到全部状态
+        if selectedMainType == mainType && mainType != .all {
+            selectedMainType = .all
+            selectedFilter = .all
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isExpanded = false
+            }
+            return
+        }
+        
         selectedMainType = mainType
         
         // 自动选择对应的FilterType

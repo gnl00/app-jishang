@@ -183,7 +183,7 @@ class TransactionStore: ObservableObject {
             Transaction(amount: 5000, category: .salary, type: .income, date: calendar.date(byAdding: .day, value: -1, to: today)!, note: "月薪"),
             Transaction(amount: 1000, category: .bonus, type: .income, date: calendar.date(byAdding: .day, value: -5, to: today)!, note: "绩效奖金"),
             Transaction(amount: 2500, category: .investment, type: .income, date: calendar.date(byAdding: .day, value: -10, to: today)!, note: "股票收益"),
-            Transaction(amount: 800, category: .other, type: .income, date: calendar.date(byAdding: .day, value: -15, to: today)!, note: "兼职收入"),
+            Transaction(amount: 800, category: .other, type: .expense, date: calendar.date(byAdding: .day, value: -15, to: today)!, note: "其他购买"),
             Transaction(amount: 35.5, category: .food, type: .expense, date: calendar.date(byAdding: .day, value: -1, to: today)!, note: "午餐"),
             Transaction(amount: 120, category: .transport, type: .expense, date: calendar.date(byAdding: .day, value: -2, to: today)!, note: "打车费"),
             Transaction(amount: 299, category: .shopping, type: .expense, date: calendar.date(byAdding: .day, value: -3, to: today)!, note: "购买衣服"),
