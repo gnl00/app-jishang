@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8B02FF0C2E701E840048452E /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 8B02FF0B2E701E840048452E /* Pow */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		8BEF275C2E6E870000407BA2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8B02FF0C2E701E840048452E /* Pow in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +130,7 @@
 			);
 			name = jishang;
 			packageProductDependencies = (
+				8B02FF0B2E701E840048452E /* Pow */,
 			);
 			productName = jishang;
 			productReference = 8BEF274E2E6E86FE00407BA2 /* jishang.app */;
@@ -208,6 +214,9 @@
 			);
 			mainGroup = 8BEF27452E6E86FE00407BA2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8B02FF0A2E701C090048452E /* XCRemoteSwiftPackageReference "Pow" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8BEF274F2E6E86FE00407BA2 /* Products */;
 			projectDirPath = "";
@@ -571,6 +580,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8B02FF0A2E701C090048452E /* XCRemoteSwiftPackageReference "Pow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EmergeTools/Pow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8B02FF0B2E701E840048452E /* Pow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8B02FF0A2E701C090048452E /* XCRemoteSwiftPackageReference "Pow" */;
+			productName = Pow;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8BEF27462E6E86FE00407BA2 /* Project object */;
 }

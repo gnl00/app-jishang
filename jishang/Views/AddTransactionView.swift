@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Pow
 
 struct AddTransactionView: View {
     @ObservedObject var store: TransactionStore
@@ -63,139 +64,14 @@ struct AddTransactionView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 24) {
-                // Transaction Type Header
-                HStack {
-                    Image(systemName: transactionType == .income ? "plus.circle.fill" : "minus.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(transactionType == .income ? .blue : .red)
-                    
-                    Text(isEditing ? (transactionType == .income ? "编辑收入" : "编辑支出") : (transactionType == .income ? "添加收入" : "添加支出"))
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                }
-                .padding(.top)
-                
-                VStack(spacing: 20) {
-                    // Amount Input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("金额")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                        
-                        HStack {
-                            Text("¥")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.primary)
-                            
-                            TextField("0.00", text: $amount)
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
-                                .keyboardType(.decimalPad)
-                                .focused($isAmountFocused)
-                        }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                    }
-                    
-                    // Category Selection
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("分类")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                        
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
-                            ForEach(filteredCategories, id: \.id) { category in
-                                CategoryButton(
-                                    category: category,
-                                    isSelected: selectedCategory?.id == category.id
-                                ) {
-                                    selectedCategory = category
-                                }
-                            }
-                            
-                            // 添加类别按钮
-                            Button(action: {
-                                showAddCategory = true
-                            }) {
-                                VStack(spacing: 4) {
-                                    Image(systemName: "plus.circle")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(.blue)
-                                    
-                                    Text("添加")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(.blue)
-                                        .lineLimit(1)
-                                }
-                                .frame(height: 60)
-                                .frame(maxWidth: .infinity)
-                                .background(Color(.systemGray6))
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Note Input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("备注")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                        
-                        TextField("添加备注...", text: $note)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-                    }
-                    
-                    // Date Selection
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("日期")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                        
-                        DatePicker("选择日期", selection: $date, displayedComponents: .date)
-                            .datePickerStyle(.compact)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-                    }
-                    
-                    Spacer()
-                }
-                
-                // Action Buttons
-                HStack(spacing: 16) {
-                    Button("取消") {
-                        editingTransaction = nil
-                    }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color(.systemGray5))
-                    .cornerRadius(12)
-                    
-                    Button(isEditing ? "更新" : "保存") {
-                        saveTransaction()
-                    }
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(isValidInput ? (Color.green) : Color.gray)
-                    .cornerRadius(12)
-                    .disabled(!isValidInput)
-                }
-                .padding(.bottom)
+                headerSection
+                inputSections
+                Spacer()
+                actionButtons
             }
             .padding()
             .navigationBarHidden(true)
+            .transition(.slide.animation(.spring(response: 0.5, dampingFraction: 0.8)))
         }
         .sheet(isPresented: $showAddCategory) {
             AddCategoryView(
@@ -220,6 +96,154 @@ struct AddTransactionView: View {
                 isAmountFocused = true
             }
         }
+    }
+    
+    private var headerSection: some View {
+        HStack {
+            Image(systemName: transactionType == .income ? "plus.circle.fill" : "minus.circle.fill")
+                .font(.system(size: 24))
+                .foregroundColor(transactionType == .income ? .blue : .red)
+            
+            Text(isEditing ? (transactionType == .income ? "编辑收入" : "编辑支出") : (transactionType == .income ? "添加收入" : "添加支出"))
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.primary)
+                .transition(.slide)
+            
+            Spacer()
+        }
+        .padding(.top)
+    }
+    
+    private var inputSections: some View {
+        VStack(spacing: 20) {
+            amountSection
+            categorySection
+            noteSection
+            dateSection
+        }
+    }
+    
+    private var amountSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("金额")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            HStack {
+                Text("¥")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                TextField("0.00", text: $amount)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .keyboardType(.decimalPad)
+                    .focused($isAmountFocused)
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            .transition(.scale.combined(with: .opacity))
+        }
+    }
+    
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("分类")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
+                ForEach(filteredCategories, id: \.id) { category in
+                    CategoryButton(
+                        category: category,
+                        isSelected: selectedCategory?.id == category.id
+                    ) {
+                        selectedCategory = category
+                    }
+                }
+                
+                // 添加类别按钮
+                Button(action: {
+                    showAddCategory = true
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(.blue)
+                        
+                        Text("添加")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.blue)
+                            .lineLimit(1)
+                    }
+                    .frame(height: 60)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    )
+                }
+            }
+        }
+        .transition(.slide.combined(with: .scale))
+    }
+    
+    private var noteSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("备注")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            TextField("添加备注...", text: $note)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+        }
+        .transition(.slide.combined(with: .opacity))
+    }
+    
+    private var dateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("日期")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.secondary)
+            
+            DatePicker("选择日期", selection: $date, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+        }
+        .transition(.slide.combined(with: .opacity))
+    }
+    
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button("取消") {
+                editingTransaction = nil
+            }
+            .font(.system(size: 16, weight: .medium))
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(Color(.systemGray5))
+            .cornerRadius(12)
+            
+            Button(isEditing ? "更新" : "保存") {
+                saveTransaction()
+            }
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(isValidInput ? (Color.green) : Color.gray)
+            .cornerRadius(12)
+            .disabled(!isValidInput)
+        }
+        .padding(.bottom)
+        .transition(.slide.combined(with: .opacity))
     }
     
     private func saveTransaction() {
@@ -275,6 +299,8 @@ struct CategoryButton: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
             )
+            .scaleEffect(isSelected ? 1.05 : 1.0)
+            .changeEffect(.wiggle, value: isSelected)
         }
         .animation(.easeInOut(duration: 0.2), value: isSelected)
     }

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Pow
 
 struct ActionButtonView: View {
     let title: String
@@ -38,6 +39,8 @@ struct ActionButtonView: View {
                     Image(systemName: icon)
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(iconColor.opacity(0.5))
+                        .changeEffect(.wiggle, value: isPressed)
+                        .changeEffect(.glow, value: isPressed)
                     
                     Text(title)
                         .font(.system(size: 16, weight: .semibold))
@@ -48,6 +51,7 @@ struct ActionButtonView: View {
             .frame(height: 100)
             .contentShape(Rectangle())
             .scaleEffect(isPressed ? 0.95 : 1.0)
+            .changeEffect(.wiggle, value: isPressed)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
             .onTapGesture {
                 // 短按震动反馈
@@ -97,6 +101,7 @@ struct SummaryCardsView: View {
                 action: onIncomeAction,
                 longPressAction: onVoiceIncomeAction
             )
+            .transition(.slide)
 
             ActionButtonView(
                 title: "记支出",
@@ -107,8 +112,10 @@ struct SummaryCardsView: View {
                 action: onExpenseAction,
                 longPressAction: onVoiceExpenseAction
             )
+            .transition(.slide)
         }
         .padding(.horizontal)
+        .transition(.scale.combined(with: .opacity))
     }
 }
 

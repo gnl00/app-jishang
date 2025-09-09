@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Pow
 
 struct MonthlyStatisticsView: View {
     @ObservedObject var store: TransactionStore
@@ -34,6 +35,8 @@ struct MonthlyStatisticsView: View {
                     cornerRadius: [.topLeft, .bottomLeft]
                 )
                 .frame(width: geometry.size.width * 0.25)
+                .transition(.slide)
+                .changeEffect(.wiggle, value: currentMonthExpense)
                 
                 // Monthly Balance (Center) - 2/4 width  
                 BalanceSection(
@@ -43,6 +46,8 @@ struct MonthlyStatisticsView: View {
                     textColor: balance >= 0 ? .green : .primary
                 )
                 .frame(width: geometry.size.width * 0.5)
+                .transition(.scale)
+                .changeEffect(.wiggle, value: balance)
                 
                 // Monthly Income (Right) - 1/4 width
                 StatisticSection(
@@ -53,6 +58,8 @@ struct MonthlyStatisticsView: View {
                     cornerRadius: [.topRight, .bottomRight]
                 )
                 .frame(width: geometry.size.width * 0.25)
+                .transition(.slide)
+                .changeEffect(.wiggle, value: currentMonthIncome)
             }
         }
         .background(
@@ -63,9 +70,11 @@ struct MonthlyStatisticsView: View {
                         .stroke(Color(.systemGray4), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
+                .changeEffect(.glow, value: balance != 0)
         )
         .frame(height: 120)
         .padding(.horizontal)
+        .transition(.slide.combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.7)))
     }
 }
 
@@ -81,15 +90,18 @@ struct StatisticSection: View {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.secondary)
+                .changeEffect(.wiggle, value: title)
             
             Text(amount.currencyFormatted)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundColor(textColor)
+                .changeEffect(.shine, value: amount)
         }
         .frame(maxWidth: .infinity)
         .frame(maxHeight: .infinity)
         .background(backgroundColor)
         .clipShape(RoundedCorner(radius: 12, corners: cornerRadius))
+        .changeEffect(.wiggle, value: amount)
     }
 }
 
@@ -104,14 +116,19 @@ struct BalanceSection: View {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.secondary)
+                .changeEffect(.wiggle, value: title)
             
             Text(amount.currencyFormatted)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(textColor)
+                .changeEffect(.glow, value: amount > 0)
         }
         .frame(maxWidth: .infinity)
         .frame(maxHeight: .infinity)
         .background(backgroundColor)
+        .changeEffect(.wiggle, value: amount)
+        .scaleEffect(amount > 0 ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.3), value: amount > 0)
     }
 }
 

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Pow
 
 struct TransactionListView: View {
     @ObservedObject var store: TransactionStore
@@ -13,6 +14,7 @@ struct TransactionListView: View {
     
     @State private var editingTransaction: Transaction?
     @State private var showEditView = false
+    @State private var deletingTransactionId: UUID?
     
     private var filteredTransactions: [Transaction] {
         return store.transactions
@@ -23,6 +25,9 @@ struct TransactionListView: View {
     var body: some View {
         List(filteredTransactions) { transaction in
             TransactionRowView(transaction: transaction)
+                .transition(.slide)
+                .opacity(deletingTransactionId == transaction.id ? 0.3 : 1.0)
+                .scaleEffect(deletingTransactionId == transaction.id ? 0.8 : 1.0)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button("删除", role: .destructive) {
                         store.deleteTransaction(transaction)
@@ -49,6 +54,7 @@ struct TransactionListView: View {
 
 struct TransactionRowView: View {
     let transaction: Transaction
+    @State private var isPressed = false
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -75,6 +81,7 @@ struct TransactionRowView: View {
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
+                        .transition(.slide.combined(with: .opacity))
                 }
             }
             
@@ -91,6 +98,14 @@ struct TransactionRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .onTapGesture {
+            isPressed.toggle()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isPressed = false
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: isPressed)
     }
 }
 
