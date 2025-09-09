@@ -9,9 +9,9 @@ import SwiftUI
 
 struct AddTransactionView: View {
     @ObservedObject var store: TransactionStore
-    @Binding var isPresented: Bool
+    @Binding var editingTransaction: Transaction? // 绑定到parent的editingTransaction
     let transactionType: TransactionType
-    let editingTransaction: Transaction? // 新增：可选的编辑交易
+    let initialTransaction: Transaction? // 初始编辑的交易数据
     
     @State private var amount: String = ""
     @State private var selectedCategory: Category?
@@ -20,11 +20,22 @@ struct AddTransactionView: View {
     @State private var showAddCategory = false
     @FocusState private var isAmountFocused: Bool
     
-    init(store: TransactionStore, isPresented: Binding<Bool>, transactionType: TransactionType, editingTransaction: Transaction? = nil) {
+    init(store: TransactionStore, editingTransaction: Binding<Transaction?>, transactionType: TransactionType, initialTransaction: Transaction? = nil) {
         self.store = store
-        self._isPresented = isPresented
+        self._editingTransaction = editingTransaction
         self.transactionType = transactionType
-        self.editingTransaction = editingTransaction
+        self.initialTransaction = initialTransaction
+    }
+    
+    // 兼容性构造器，用于新增交易（非编辑场景）
+    init(store: TransactionStore, isPresented: Binding<Bool>, transactionType: TransactionType) {
+        self.store = store
+        self._editingTransaction = Binding(
+            get: { nil },
+            set: { _ in isPresented.wrappedValue = false }
+        )
+        self.transactionType = transactionType
+        self.initialTransaction = nil
     }
     
     private var filteredCategories: [Category] {
@@ -46,7 +57,7 @@ struct AddTransactionView: View {
     }
     
     private var isEditing: Bool {
-        return editingTransaction != nil
+        return initialTransaction != nil
     }
     
     var body: some View {
@@ -161,7 +172,7 @@ struct AddTransactionView: View {
                 // Action Buttons
                 HStack(spacing: 16) {
                     Button("取消") {
-                        isPresented = false
+                        editingTransaction = nil
                     }
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.secondary)
@@ -177,7 +188,7 @@ struct AddTransactionView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(isValidInput ? (transactionType == .income ? Color.blue : Color.red) : Color.gray)
+                    .background(isValidInput ? (Color.green) : Color.gray)
                     .cornerRadius(12)
                     .disabled(!isValidInput)
                 }
@@ -195,7 +206,7 @@ struct AddTransactionView: View {
             )
         }
         .onAppear {
-            if let editing = editingTransaction {
+            if let editing = initialTransaction {
                 // 编辑模式：预填充数据
                 amount = String(editing.amount)
                 selectedCategory = editing.category
@@ -215,7 +226,7 @@ struct AddTransactionView: View {
         guard let amountValue = Double(amount), amountValue > 0,
               let category = selectedCategory else { return }
         
-        if let editing = editingTransaction {
+        if let editing = initialTransaction {
             // 编辑模式：更新现有交易
             var updatedTransaction = editing
             updatedTransaction.amount = amountValue
@@ -236,7 +247,7 @@ struct AddTransactionView: View {
             store.addTransaction(transaction)
         }
         
-        isPresented = false
+        editingTransaction = nil
     }
 }
 

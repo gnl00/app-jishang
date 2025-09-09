@@ -31,21 +31,18 @@ struct TransactionListView: View {
                 .swipeActions(edge: .leading) {
                     Button("编辑") {
                         editingTransaction = transaction
-                        showEditView = true
                     }
                     .tint(.blue)
                 }
         }
         .listStyle(.plain)
-        .sheet(isPresented: $showEditView) {
-            if let transaction = editingTransaction {
-                AddTransactionView(
-                    store: store,
-                    isPresented: $showEditView,
-                    transactionType: transaction.type,
-                    editingTransaction: transaction
-                )
-            }
+        .sheet(item: $editingTransaction) { transaction in
+            AddTransactionView(
+                store: store,
+                editingTransaction: $editingTransaction,
+                transactionType: transaction.type,
+                initialTransaction: transaction
+            )
         }
     }
 }
