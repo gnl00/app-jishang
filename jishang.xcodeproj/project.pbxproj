@@ -29,9 +29,22 @@
 		8BEF27652E6E870000407BA2 /* jishangUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = jishangUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8B02FF092E6FF4040048452E /* Exceptions for "jishang" folder in "jishang" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8BEF274D2E6E86FE00407BA2 /* jishang */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8BEF27502E6E86FE00407BA2 /* jishang */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8B02FF092E6FF4040048452E /* Exceptions for "jishang" folder in "jishang" target */,
+			);
 			path = jishang;
 			sourceTree = "<group>";
 		};
@@ -398,6 +411,7 @@
 				DEVELOPMENT_TEAM = C5KLY83TJS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = jishang/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "记上";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -428,6 +442,7 @@
 				DEVELOPMENT_TEAM = C5KLY83TJS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = jishang/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "记上";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

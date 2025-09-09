@@ -35,7 +35,7 @@ struct TransactionRowView: View {
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd"
+        formatter.dateFormat = "YYYY/MM/dd"
         return formatter
     }
     

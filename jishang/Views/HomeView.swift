@@ -11,6 +11,8 @@ struct HomeView: View {
     @EnvironmentObject var transactionStore: TransactionStore
     @State private var selectedFilter: FilterType = .all
     @State private var presentedTransactionType: TransactionType?
+    @State private var showVoiceInput = false
+    @State private var voiceInputType: TransactionType = .expense
     
     var body: some View {
         NavigationView {
@@ -23,6 +25,14 @@ struct HomeView: View {
                         },
                         onIncomeAction: {
                             presentedTransactionType = .income
+                        },
+                        onVoiceExpenseAction: {
+                            voiceInputType = .expense
+                            showVoiceInput = true
+                        },
+                        onVoiceIncomeAction: {
+                            voiceInputType = .income
+                            showVoiceInput = true
                         }
                     )
                     
@@ -60,6 +70,55 @@ struct HomeView: View {
                     transactionType: type
                 )
             }
+            .sheet(isPresented: $showVoiceInput) {
+                VoiceInputView(
+                    isPresented: $showVoiceInput,
+                    transactionType: voiceInputType
+                ) { voiceText in
+                    handleVoiceResult(voiceText)
+                }
+            }
+        }
+    }
+    
+    private func handleVoiceResult(_ voiceText: String) {
+        let parser = VoiceTransactionParser()
+        
+        guard let parsedTransaction = parser.parseVoiceText(voiceText, expectedType: voiceInputType) else {
+            print("无法解析语音内容: \(voiceText)")
+            return
+        }
+        
+        // 查找匹配的类别
+        var selectedCategory: Category?
+        if let categoryName = parsedTransaction.category {
+            selectedCategory = transactionStore.allCategories.first { category in
+                category.name == categoryName && 
+                (category.defaultType == parsedTransaction.type || category.isCustom)
+            }
+        }
+        
+        // 如果没有找到匹配的类别，使用默认类别
+        if selectedCategory == nil {
+            selectedCategory = transactionStore.allCategories.first { category in
+                category.defaultType == parsedTransaction.type && !category.isCustom
+            }
+        }
+        
+        // 创建交易记录
+        if let category = selectedCategory {
+            let transaction = Transaction(
+                amount: parsedTransaction.amount,
+                category: category,
+                type: parsedTransaction.type,
+                date: Date(),
+                note: parsedTransaction.description
+            )
+            
+            transactionStore.addTransaction(transaction)
+            print("语音记账成功: \(parsedTransaction.description) - ¥\(parsedTransaction.amount)")
+        } else {
+            print("无法找到合适的类别")
         }
     }
 }
