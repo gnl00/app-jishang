@@ -74,7 +74,7 @@ struct HeaderSectionView: View {
     var body: some View {
         HStack {
             Text("Monthly Statistics")
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: 12, weight: .regular))
                 .foregroundColor(.primary)
             
             Spacer()
@@ -146,7 +146,7 @@ struct CostBalanceProgressView: View {
                 ZStack(alignment: .leading) {
                     // 背景条（总收入）
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray5))
+                        .fill(Color(.systemGray6))
                         .frame(height: 44)
                     
                     HStack(spacing: 0) {
@@ -176,7 +176,10 @@ struct CostBalanceProgressView: View {
                         value: expense,
                         font: .system(size: 12, weight: .regular, design: .rounded),
                         textColor: .red,
-                        prefix: "¥"
+                        prefix: "¥",
+                        digitWidth: 12,
+                        decimalPointWidth: 6,
+                        separatorWidth: 6
                     )
                     Text("expense")
                         .font(.system(size: 12, weight: .medium))
@@ -190,7 +193,10 @@ struct CostBalanceProgressView: View {
                         value: balance,
                         font: .system(size: 12, weight: .regular, design: .rounded),
                         textColor: balance >= 0 ? .blue : .red,
-                        prefix: "¥"
+                        prefix: "¥",
+                        digitWidth: 12,
+                        decimalPointWidth: 6,
+                        separatorWidth: 6
                     )
                     Text("balance")
                         .font(.system(size: 12, weight: .medium))
@@ -278,16 +284,35 @@ struct RollingNumberView: View {
     let textColor: Color
     let prefix: String
     let showDecimals: Bool
+    // Configurable widths
+    let digitWidth: CGFloat
+    let decimalPointWidth: CGFloat
+    let separatorWidth: CGFloat
+    let currencyUnitWidth: CGFloat
     
     @State private var animatedValue: Double = 0
     @State private var previousValue: Double = 0
     
-    init(value: Double, font: Font = .system(size: 18, weight: .bold, design: .rounded), textColor: Color = .primary, prefix: String = "", showDecimals: Bool = true) {
+    init(
+        value: Double,
+        font: Font = .system(size: 18, weight: .bold, design: .rounded),
+        textColor: Color = .primary,
+        prefix: String = "",
+        showDecimals: Bool = true,
+        digitWidth: CGFloat = 16,
+        decimalPointWidth: CGFloat = 8,
+        separatorWidth: CGFloat = 8,
+        currencyUnitWidth: CGFloat = 20
+    ) {
         self.value = value
         self.font = font
         self.textColor = textColor
         self.prefix = prefix
         self.showDecimals = showDecimals
+        self.digitWidth = digitWidth
+        self.decimalPointWidth = decimalPointWidth
+        self.separatorWidth = separatorWidth
+        self.currencyUnitWidth = currencyUnitWidth
     }
     
     private var formattedValue: String {
@@ -322,16 +347,16 @@ struct RollingNumberView: View {
                         font: font,
                         textColor: textColor
                     )
-                    .frame(width: 16) // 数字宽度
+                    .frame(width: digitWidth) // 数字宽度（可配置）
                 } else {
                     Text(character)
                         .font(font)
                         .foregroundColor(textColor)
                         .frame(width: {
                             // 根据字符类型分配不同宽度
-                            if character == "." { return 8 }
-                            if character == "¥" || character == "$" { return 20 } // 货币符号需要更宽
-                            if character == "," { return 8 } // 千分位分隔符
+                            if character == "." { return decimalPointWidth }
+                            if character == "¥" || character == "$" { return currencyUnitWidth } // 货币符号需要更宽
+                            if character == "," { return separatorWidth } // 千分位分隔符
                             return 12 // 其他符号默认宽度
                         }())
                 }
