@@ -37,10 +37,10 @@ struct CategoryFilterView: View {
         case .all:
             return []
         case .income:
-            return store.allCategories.filter { $0.defaultType == .income || $0.isCustom }
+            return store.allCategories.filter { $0.defaultType == .income }
                 .map { .byCategory($0) }
         case .expense:
-            return store.allCategories.filter { $0.defaultType == .expense || $0.isCustom }
+            return store.allCategories.filter { $0.defaultType == .expense }
                 .map { .byCategory($0) }
         }
     }
