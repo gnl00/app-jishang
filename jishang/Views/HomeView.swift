@@ -53,7 +53,6 @@ struct HomeView: View {
                 .background(Color(.systemGroupedBackground))
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("记账本")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $presentedTransactionType) { type in
                 AddTransactionView(

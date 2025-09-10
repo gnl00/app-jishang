@@ -35,7 +35,7 @@ struct MonthlyStatisticsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             // Section 1: Header with title and expand arrow
             HeaderSectionView(isExpanded: $isExpanded)
             
@@ -53,7 +53,7 @@ struct MonthlyStatisticsView: View {
             MonthSwitcherView(selectedPeriod: $selectedPeriod)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
@@ -73,7 +73,7 @@ struct HeaderSectionView: View {
     
     var body: some View {
         HStack {
-            Text("Monthly Statistics")
+            Text("Account Overview")
                 .font(.system(size: 12, weight: .regular))
                 .foregroundColor(.primary)
             
@@ -91,7 +91,7 @@ struct HeaderSectionView: View {
                     .animation(.easeInOut(duration: 0.1), value: isExpanded)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 
@@ -119,7 +119,7 @@ struct IncomeDetailsView: View {
                         .stroke(Color(.systemGray5), lineWidth: 1)
                 )
         )
-        .changeEffect(.glow, value: income)
+        // Removed Pow changeEffect to avoid overlapping per-frame updates
     }
 }
 
@@ -141,71 +141,71 @@ struct CostBalanceProgressView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // Boss血条样式的进度条
+            // 顶部标签（仅文案）
+            HStack {
+                Text("expense")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("balance")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            
+            // 血条样式的进度条
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // 背景条（总收入）
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(.systemGray6))
-                        .frame(height: 44)
+                        .frame(height: 28)
                     
                     HStack(spacing: 0) {
                         // Cost部分（淡红色）
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.red.opacity(0.6))
-                            .frame(width: geometry.size.width * expenseRatio, height: 44)
+                            .frame(width: geometry.size.width * expenseRatio, height: 28)
                             .animation(.easeInOut(duration: 0.8), value: expenseRatio)
                         
                         // Balance部分（淡蓝色）
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.blue.opacity(0.6))
-                            .frame(width: geometry.size.width * balanceRatio, height: 44)
+                            .frame(width: geometry.size.width * balanceRatio, height: 28)
                             .animation(.easeInOut(duration: 0.8), value: balanceRatio)
                         
                         Spacer(minLength: 0)
                     }
                 }
             }
-            .frame(height: 44)
+            .frame(height: 28)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             
-            // 金额显示
+            // 数字显示（保留在进度条下方）
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    RollingNumberView(
-                        value: expense,
-                        font: .system(size: 12, weight: .regular, design: .rounded),
-                        textColor: .red,
-                        prefix: "¥",
-                        digitWidth: 12,
-                        decimalPointWidth: 6,
-                        separatorWidth: 6
-                    )
-                    Text("expense")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
+                RollingNumberView(
+                    value: expense,
+                    font: .system(size: 12, weight: .regular, design: .rounded),
+                    textColor: .red,
+                    prefix: "¥",
+                    digitWidth: 12,
+                    decimalPointWidth: 6,
+                    separatorWidth: 6
+                )
                 
                 Spacer()
                 
-                VStack(alignment: .trailing, spacing: 2) {
-                    RollingNumberView(
-                        value: balance,
-                        font: .system(size: 12, weight: .regular, design: .rounded),
-                        textColor: balance >= 0 ? .blue : .red,
-                        prefix: "¥",
-                        digitWidth: 12,
-                        decimalPointWidth: 6,
-                        separatorWidth: 6
-                    )
-                    Text("balance")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
+                RollingNumberView(
+                    value: balance,
+                    font: .system(size: 12, weight: .regular, design: .rounded),
+                    textColor: balance >= 0 ? .blue : .red,
+                    prefix: "¥",
+                    digitWidth: 12,
+                    decimalPointWidth: 6,
+                    separatorWidth: 6
+                )
             }
         }
-        .changeEffect(.wiggle, value: expense)
-        .changeEffect(.glow, value: balance)
+        // Removed Pow changeEffects to avoid multi-updates per frame warnings
     }
 }
 
@@ -213,7 +213,7 @@ struct CostBalanceProgressView: View {
 struct MonthSwitcherView: View {
     @Binding var selectedPeriod: Int
     
-    private let periodOptions = ["current month", "last month"]
+    private let periodOptions = ["本月", "上个月"]
     
     var body: some View {
         Picker("Period", selection: $selectedPeriod) {
@@ -273,8 +273,7 @@ struct DigitRollingView: View {
         .onAppear {
             displayedDigit = digit
         }
-        // 添加数字变化时的摆动效果
-        .changeEffect(.wiggle, value: digit)
+        // Removed extra changeEffect to prevent overlapping state updates
     }
 }
 
@@ -291,7 +290,6 @@ struct RollingNumberView: View {
     let currencyUnitWidth: CGFloat
     
     @State private var animatedValue: Double = 0
-    @State private var previousValue: Double = 0
     
     init(
         value: Double,
@@ -333,10 +331,7 @@ struct RollingNumberView: View {
         }
     }
     
-    // 判断是否有变化来触发发光效果
-    private var hasChanged: Bool {
-        return value != previousValue
-    }
+    // Removed previousValue tracking to reduce redundant state changes
     
     var body: some View {
         HStack(spacing: 0) {
@@ -363,19 +358,14 @@ struct RollingNumberView: View {
             }
         }
         .onChange(of: value) { _, newValue in
-            previousValue = animatedValue
-            
             withAnimation(.easeInOut(duration: 0.5)) {
                 animatedValue = newValue
             }
         }
         .onAppear {
             animatedValue = value
-            previousValue = value
         }
-        // 添加 Pow 动画效果
-        .changeEffect(.shine, value: value) // 数值变化时的闪光效果
-        .changeEffect(.glow, value: hasChanged) // 变化时的发光效果
+        // Removed Pow changeEffects to avoid overlapping onChange(Date) triggers
     }
 }
 

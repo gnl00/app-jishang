@@ -91,7 +91,7 @@ struct SummaryCardsView: View {
     }
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             ActionButtonView(
                 title: "记收入",
                 icon: "plus.circle.fill",
