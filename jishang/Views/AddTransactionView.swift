@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import Pow
 
 struct AddTransactionView: View {
@@ -19,6 +20,7 @@ struct AddTransactionView: View {
     @State private var note: String = ""
     @State private var date = Date()
     @State private var showAddCategory = false
+    @State private var isDeleteMode = false
     @FocusState private var isAmountFocused: Bool
     
     init(store: TransactionStore, editingTransaction: Binding<Transaction?>, transactionType: TransactionType, initialTransaction: Transaction? = nil) {
@@ -154,11 +156,53 @@ struct AddTransactionView: View {
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
                 ForEach(filteredCategories, id: \.id) { category in
-                    CategoryButton(
-                        category: category,
-                        isSelected: selectedCategory?.id == category.id
-                    ) {
-                        selectedCategory = category
+                    ZStack(alignment: .topTrailing) {
+                        CategoryButton(
+                            category: category,
+                            isSelected: selectedCategory?.id == category.id
+                        ) {
+                            if !isDeleteMode {
+                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                generator.impactOccurred()
+                                selectedCategory = category
+                            }
+                        }
+                        
+                        // 删除分类小按钮
+                        if isDeleteMode && category.isCustom {
+                            Button(action: {
+                                // 删除分类，并将该分类下的交易置为空
+                                store.deleteCategoryAndReassign(category)
+                                // 如果当前选中的是该分类，清空选择
+                                if selectedCategory?.id == category.id {
+                                    // 重新选择一个可用分类（若存在）
+                                    selectedCategory = filteredCategories.first
+                                }
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.red)
+                                    .background(Color(.systemBackground).opacity(0.9))
+                                    .clipShape(Circle())
+                                    .contentShape(Circle())
+                                    .compositingGroup()
+                            }
+                            // 保持在卡片内部边距，避免被内容遮挡
+                            .padding(.top, 6)
+                            .padding(.trailing, 6)
+                            // 始终置于卡片之上，避免覆盖问题
+                            .zIndex(1)
+                            // 使用 Pow 的过渡，插入时 Glare，移除时 Iris 从右上角收缩并淡出
+                            .transition(
+                                .asymmetric(
+                                    insertion: .movingParts.glare(angle: .degrees(225)),
+                                    removal: .movingParts.iris(origin: .topTrailing, blurRadius: 1)
+                                        .combined(with: .opacity)
+                                )
+                            )
+                            // 使用 Pow 的缓入指数动画，增强消失流畅度
+                            .animation(.movingParts.easeInExponential(duration: 0.35), value: isDeleteMode)
+                        }
                     }
                 }
                 
@@ -183,6 +227,32 @@ struct AddTransactionView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    )
+                }
+
+                // 删除类别按钮（设计风格与“添加”一致）
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isDeleteMode.toggle()
+                    }
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "minus.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(.red)
+                        
+                        Text("删除")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.red)
+                            .lineLimit(1)
+                    }
+                    .frame(height: 60)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
                     )
                 }
             }
@@ -232,6 +302,8 @@ struct AddTransactionView: View {
             .cornerRadius(12)
             
             Button(isEditing ? "更新" : "保存") {
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
                 saveTransaction()
             }
             .font(.system(size: 16, weight: .semibold))

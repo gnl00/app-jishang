@@ -270,6 +270,26 @@ class TransactionStore: ObservableObject {
         customCategories.removeAll { $0.id == category.id }
         saveCustomCategories()
     }
+
+    /// 删除自定义分类，并将该分类下的所有交易的分类置为空（不删除交易）。
+    /// 空分类通过创建一个名称与图标均为空字符串的占位分类来表示，按交易本身的类型分别生成收入/支出的占位分类。
+    func deleteCategoryAndReassign(_ category: Category) {
+        // 仅允许删除自定义分类，预置分类忽略
+        guard category.isCustom else { return }
+
+        // 从自定义分类中移除
+        customCategories.removeAll { $0.id == category.id }
+        saveCustomCategories()
+
+        // 将所有属于该分类的交易，分类置为空（按交易类型生成占位类别）
+        for i in transactions.indices {
+            if transactions[i].category.id == category.id {
+                let placeholder = Category(name: "", icon: "", defaultType: transactions[i].type, isCustom: true)
+                transactions[i].category = placeholder
+            }
+        }
+        saveTransactions()
+    }
     
     private func loadSampleData() {
         let calendar = Calendar.current

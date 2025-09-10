@@ -56,10 +56,10 @@ struct MonthlyStatisticsView: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+                .fill(Color.clear)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(.systemGray4), lineWidth: 1)
+                        .stroke(Color(.systemGray5), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         )
@@ -157,7 +157,7 @@ struct CostBalanceProgressView: View {
                 ZStack(alignment: .leading) {
                     // 背景条（总收入）
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray6))
+                        .fill(Color.clear)
                         .frame(height: 28)
                     
                     HStack(spacing: 0) {
