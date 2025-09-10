@@ -219,7 +219,7 @@ struct MainFilterButton: View {
                     }
                 )
         }
-        .changeEffect(.wiggle, value: isSelected)
+        .changeEffect(.shine, value: isSelected)
     }
 }
 
@@ -249,7 +249,7 @@ struct SubFilterButton: View {
                     }
                 )
         }
-        .changeEffect(.wiggle, value: isSelected)
+        .changeEffect(.shine, value: isSelected)
     }
 }
 

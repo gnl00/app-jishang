@@ -36,7 +36,7 @@ struct MonthlyStatisticsView: View {
                 )
                 .frame(width: geometry.size.width * 0.25)
                 .transition(.slide)
-                .changeEffect(.wiggle, value: currentMonthExpense)
+                .changeEffect(.glow, value: currentMonthExpense)
                 
                 // Monthly Balance (Center) - 2/4 width  
                 BalanceSection(
@@ -47,7 +47,7 @@ struct MonthlyStatisticsView: View {
                 )
                 .frame(width: geometry.size.width * 0.5)
                 .transition(.scale)
-                .changeEffect(.wiggle, value: balance)
+                .changeEffect(.glow, value: balance)
                 
                 // Monthly Income (Right) - 1/4 width
                 StatisticSection(
@@ -59,7 +59,7 @@ struct MonthlyStatisticsView: View {
                 )
                 .frame(width: geometry.size.width * 0.25)
                 .transition(.slide)
-                .changeEffect(.wiggle, value: currentMonthIncome)
+                .changeEffect(.glow, value: currentMonthIncome)
             }
         }
         .background(
