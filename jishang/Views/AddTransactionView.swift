@@ -42,9 +42,9 @@ struct AddTransactionView: View {
     private var filteredCategories: [Category] {
         store.allCategories.filter { category in
             if transactionType == .income {
-                return category.defaultType == .income || category.isCustom
+                return category.defaultType == .income
             } else {
-                return category.defaultType == .expense || category.isCustom
+                return category.defaultType == .expense
             }
         }
     }
