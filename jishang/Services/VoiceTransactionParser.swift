@@ -75,18 +75,19 @@ class VoiceTransactionParser {
     }
     
     private func extractAmount(from text: String) -> Double? {
-        // 使用正则表达式匹配数字+金额单位
+        // 使用正则表达式匹配数字+金额单位，支持逗号分隔的数字
         let patterns = [
-            "([0-9]+\\.?[0-9]*)\\s*元",
-            "([0-9]+\\.?[0-9]*)\\s*块",
-            "([0-9]+\\.?[0-9]*)\\s*毛",
-            "([0-9]+)\\s*分",
-            "([0-9]+\\.?[0-9]*)"  // 纯数字，作为兜底
+            "([0-9,]+\\.?[0-9]*)\\s*元",
+            "([0-9,]+\\.?[0-9]*)\\s*块", 
+            "([0-9,]+\\.?[0-9]*)\\s*毛",
+            "([0-9,]+)\\s*分",
+            "([0-9,]+\\.?[0-9]*)"  // 纯数字，作为兜底
         ]
         
         for pattern in patterns {
             if let range = text.range(of: pattern, options: .regularExpression) {
                 let matchString = String(text[range])
+                // 移除所有非数字和小数点的字符，包括逗号
                 let numberString = matchString.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
                 if let amount = Double(numberString) {
                     // 根据单位调整金额
@@ -137,10 +138,11 @@ class VoiceTransactionParser {
         // 移除金额部分
         var description = text
         let amountPatterns = [
-            "[0-9]+\\.?[0-9]*\\s*元",
-            "[0-9]+\\.?[0-9]*\\s*块",
-            "[0-9]+\\.?[0-9]*\\s*毛",
-            "[0-9]+\\s*分"
+            "[0-9,]+\\.?[0-9]*\\s*元",
+            "[0-9,]+\\.?[0-9]*\\s*块",
+            "[0-9,]+\\.?[0-9]*\\s*毛", 
+            "[0-9,]+\\s*分",
+            "[0-9,]+\\.?[0-9]*"  // 纯数字也要移除
         ]
         
         for pattern in amountPatterns {
@@ -171,12 +173,15 @@ extension VoiceTransactionParser {
         
         let examples = [
             "午饭花了30元",
-            "买咖啡15块5",
+            "买咖啡15块5", 
             "打车到公司25元",
             "工资收入5000元",
+            "工资收入50,000元",  // 测试逗号分隔的数字
             "红包收到200块",
             "电影票60元",
-            "房租2500元"
+            "房租2500元",
+            "打车花了12.73元",        // 测试小数
+            "工资收入 10563.82 元"    // 测试带空格的小数
         ]
         
         for example in examples {

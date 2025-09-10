@@ -87,7 +87,7 @@ struct VoiceInputView: View {
                 
                 // 提示文本
                 if !isRecording && voiceRecognizer.recognizedText.isEmpty {
-                    Text("长按开始录音，说出您的记账信息\n例如: \"午饭花了30元\" 或 \"工资收入5000元\"")
+                    Text("长按开始录音，说出您的记账信息\n例如: \"午饭花了30元\" 或 \"工资收入5000元\" 或 \"打车花了12.73元\"")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
