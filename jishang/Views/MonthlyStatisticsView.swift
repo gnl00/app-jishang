@@ -10,13 +10,24 @@ import Pow
 
 struct MonthlyStatisticsView: View {
     @ObservedObject var store: TransactionStore
+    @State private var selectedPeriod = 0
+    @State private var isExpanded = false
+    
+    private var selectedDate: Date {
+        let calendar = Calendar.current
+        if selectedPeriod == 0 {
+            return Date()
+        } else {
+            return calendar.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+        }
+    }
     
     private var currentMonthIncome: Double {
-        store.monthlyIncome(for: Date())
+        store.monthlyIncome(for: selectedDate)
     }
     
     private var currentMonthExpense: Double {
-        store.monthlyExpense(for: Date())
+        store.monthlyExpense(for: selectedDate)
     }
     
     private var balance: Double {
@@ -24,131 +35,193 @@ struct MonthlyStatisticsView: View {
     }
     
     var body: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 1) {
-                // Monthly Expense (Left) - 1/4 width
-                StatisticSection(
-                    title: "本月支出",
-                    amount: currentMonthExpense,
-                    backgroundColor: Color.clear,
-                    textColor: .red,
-                    cornerRadius: [.topLeft, .bottomLeft]
-                )
-                .frame(width: geometry.size.width * 0.25)
-                .transition(.slide)
-                .changeEffect(.glow, value: currentMonthExpense)
-                
-                // Monthly Balance (Center) - 2/4 width  
-                BalanceSection(
-                    title: "本月结余",
-                    amount: balance,
-                    backgroundColor: Color.clear,
-                    textColor: balance >= 0 ? .green : .primary
-                )
-                .frame(width: geometry.size.width * 0.5)
-                .transition(.scale)
-                .changeEffect(.glow, value: balance)
-                
-                // Monthly Income (Right) - 1/4 width
-                StatisticSection(
-                    title: "本月收入",
-                    amount: currentMonthIncome,
-                    backgroundColor: Color.clear,
-                    textColor: .blue,
-                    cornerRadius: [.topRight, .bottomRight]
-                )
-                .frame(width: geometry.size.width * 0.25)
-                .transition(.slide)
-                .changeEffect(.glow, value: currentMonthIncome)
-            }
+        VStack(spacing: 16) {
+            // Section 1: Header with title and expand arrow
+            HeaderSectionView(isExpanded: $isExpanded)
+            
+            // Section 2: Monthly income details
+            IncomeDetailsView(income: currentMonthIncome)
+            
+            // Section 3: Monthly cost and balance with progress bars
+            CostBalanceProgressView(
+                expense: currentMonthExpense,
+                balance: balance,
+                totalIncome: currentMonthIncome
+            )
+            
+            // Section 4: SegmentedControl for month switching
+            MonthSwitcherView(selectedPeriod: $selectedPeriod)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemGray6))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: 12)
                         .stroke(Color(.systemGray4), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
-                .changeEffect(.glow, value: balance != 0)
+                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
         )
-        .frame(height: 120)
         .padding(.horizontal)
-        .transition(.slide.combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.7)))
     }
 }
 
-struct StatisticSection: View {
-    let title: String
-    let amount: Double
-    let backgroundColor: Color
-    let textColor: Color
-    let cornerRadius: UIRectCorner
+// MARK: - Header Section with Title and Expand Arrow
+struct HeaderSectionView: View {
+    @Binding var isExpanded: Bool
     
     var body: some View {
-        VStack(spacing: 8) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.secondary)
-                .changeEffect(.wiggle, value: title)
+        HStack {
+            Text("Monthly Statistics")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundColor(.primary)
             
-            RollingNumberView(
-                value: amount,
-                font: .system(size: 18, weight: .bold, design: .rounded),
-                textColor: textColor
-            )
-            .changeEffect(.shine, value: amount)
+            Spacer()
+            
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(.easeInOut(duration: 0.1), value: isExpanded)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .frame(maxHeight: .infinity)
-        .background(backgroundColor)
-        .clipShape(RoundedCorner(radius: 12, corners: cornerRadius))
-        .changeEffect(.wiggle, value: amount)
+        .padding(.vertical, 4)
     }
 }
 
-struct BalanceSection: View {
-    let title: String
-    let amount: Double
-    let backgroundColor: Color
-    let textColor: Color
+// MARK: - Income Details Section
+struct IncomeDetailsView: View {
+    let income: Double
     
     var body: some View {
-        VStack(spacing: 8) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.secondary)
-                .changeEffect(.wiggle, value: title)
-            
+        HStack {
             RollingNumberView(
-                value: amount,
-                font: .system(size: 20, weight: .bold, design: .rounded),
-                textColor: textColor
+                value: income,
+                font: .system(size: 24, weight: .bold, design: .rounded),
+                textColor: .primary,
+                prefix: "¥"
             )
-            .changeEffect(.glow, value: amount > 0)
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .frame(maxHeight: .infinity)
-        .background(backgroundColor)
-        .changeEffect(.wiggle, value: amount)
-        .scaleEffect(amount > 0 ? 1.05 : 1.0)
-        .animation(.easeInOut(duration: 0.3), value: amount > 0)
-    }
-}
-
-struct RoundedCorner: Shape {
-    var radius: CGFloat = .infinity
-    var corners: UIRectCorner = .allCorners
-
-    func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(
-            roundedRect: rect,
-            byRoundingCorners: corners,
-            cornerRadii: CGSize(width: radius, height: radius)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.systemBackground))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(.systemGray5), lineWidth: 1)
+                )
         )
-        return Path(path.cgPath)
+        .changeEffect(.glow, value: income)
     }
 }
+
+// MARK: - Cost and Balance Progress Section
+struct CostBalanceProgressView: View {
+    let expense: Double
+    let balance: Double
+    let totalIncome: Double
+    
+    private var expenseRatio: Double {
+        guard totalIncome > 0 else { return 0 }
+        return min(expense / totalIncome, 1.0)
+    }
+    
+    private var balanceRatio: Double {
+        guard totalIncome > 0 else { return 0 }
+        return min(max((totalIncome - expense) / totalIncome, 0), 1.0)
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Boss血条样式的进度条
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // 背景条（总收入）
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray5))
+                        .frame(height: 44)
+                    
+                    HStack(spacing: 0) {
+                        // Cost部分（淡红色）
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.red.opacity(0.6))
+                            .frame(width: geometry.size.width * expenseRatio, height: 44)
+                            .animation(.easeInOut(duration: 0.8), value: expenseRatio)
+                        
+                        // Balance部分（淡蓝色）
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.6))
+                            .frame(width: geometry.size.width * balanceRatio, height: 44)
+                            .animation(.easeInOut(duration: 0.8), value: balanceRatio)
+                        
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // 金额显示
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    RollingNumberView(
+                        value: expense,
+                        font: .system(size: 12, weight: .regular, design: .rounded),
+                        textColor: .red,
+                        prefix: "¥"
+                    )
+                    Text("expense")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    RollingNumberView(
+                        value: balance,
+                        font: .system(size: 12, weight: .regular, design: .rounded),
+                        textColor: balance >= 0 ? .blue : .red,
+                        prefix: "¥"
+                    )
+                    Text("balance")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .changeEffect(.wiggle, value: expense)
+        .changeEffect(.glow, value: balance)
+    }
+}
+
+// MARK: - Month Switcher Section
+struct MonthSwitcherView: View {
+    @Binding var selectedPeriod: Int
+    
+    private let periodOptions = ["current month", "last month"]
+    
+    var body: some View {
+        Picker("Period", selection: $selectedPeriod) {
+            ForEach(0..<periodOptions.count, id: \.self) { index in
+                Text(periodOptions[index])
+                    .tag(index)
+            }
+        }
+        .pickerStyle(SegmentedPickerStyle())
+        .animation(.easeInOut(duration: 0.3), value: selectedPeriod)
+        .padding(.top, 4)
+    }
+}
+
 
 // MARK: - Rolling Number Animation Components
 
@@ -177,7 +250,7 @@ struct DigitRollingView: View {
             }
         }
         .clipped()
-        .onChange(of: digit) { newDigit in
+        .onChange(of: digit) { _, newDigit in
             // 使用 Pow 的 boing 效果进行更有趣的过渡
             withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
                 let direction: CGFloat = newDigit > displayedDigit ? -20 : 20
@@ -249,16 +322,22 @@ struct RollingNumberView: View {
                         font: font,
                         textColor: textColor
                     )
-                    .frame(width: 12) // Fixed width for consistent spacing
+                    .frame(width: 16) // 数字宽度
                 } else {
                     Text(character)
                         .font(font)
                         .foregroundColor(textColor)
-                        .frame(width: character == "." ? 6 : 8)
+                        .frame(width: {
+                            // 根据字符类型分配不同宽度
+                            if character == "." { return 8 }
+                            if character == "¥" || character == "$" { return 20 } // 货币符号需要更宽
+                            if character == "," { return 8 } // 千分位分隔符
+                            return 12 // 其他符号默认宽度
+                        }())
                 }
             }
         }
-        .onChange(of: value) { newValue in
+        .onChange(of: value) { _, newValue in
             previousValue = animatedValue
             
             withAnimation(.easeInOut(duration: 0.5)) {

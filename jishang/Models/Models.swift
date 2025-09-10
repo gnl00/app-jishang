@@ -274,8 +274,10 @@ class TransactionStore: ObservableObject {
     private func loadSampleData() {
         let calendar = Calendar.current
         let today = Date()
+        let lastMonth = calendar.date(byAdding: .month, value: -1, to: today)!
         
         transactions = [
+            // Current month transactions
             Transaction(amount: 5000, category: .salary, type: .income, date: calendar.date(byAdding: .day, value: -1, to: today)!, note: "月薪"),
             Transaction(amount: 1000, category: .bonus, type: .income, date: calendar.date(byAdding: .day, value: -5, to: today)!, note: "绩效奖金"),
             Transaction(amount: 2500, category: .investment, type: .income, date: calendar.date(byAdding: .day, value: -10, to: today)!, note: "股票收益"),
@@ -285,7 +287,17 @@ class TransactionStore: ObservableObject {
             Transaction(amount: 299, category: .shopping, type: .expense, date: calendar.date(byAdding: .day, value: -3, to: today)!, note: "购买衣服"),
             Transaction(amount: 88, category: .entertainment, type: .expense, date: calendar.date(byAdding: .day, value: -7, to: today)!, note: "电影票"),
             Transaction(amount: 450, category: .healthcare, type: .expense, date: calendar.date(byAdding: .day, value: -12, to: today)!, note: "体检费用"),
-            Transaction(amount: 1200, category: .housing, type: .expense, date: calendar.date(byAdding: .day, value: -20, to: today)!, note: "房租")
+            Transaction(amount: 1200, category: .housing, type: .expense, date: calendar.date(byAdding: .day, value: -20, to: today)!, note: "房租"),
+            
+            // Last month transactions for comparison
+            Transaction(amount: 4800, category: .salary, type: .income, date: calendar.date(byAdding: .day, value: -5, to: lastMonth)!, note: "上月月薪"),
+            Transaction(amount: 800, category: .bonus, type: .income, date: calendar.date(byAdding: .day, value: -10, to: lastMonth)!, note: "上月奖金"),
+            Transaction(amount: 1500, category: .investment, type: .income, date: calendar.date(byAdding: .day, value: -15, to: lastMonth)!, note: "上月投资收益"),
+            Transaction(amount: 42.8, category: .food, type: .expense, date: calendar.date(byAdding: .day, value: -3, to: lastMonth)!, note: "上月餐饮"),
+            Transaction(amount: 95, category: .transport, type: .expense, date: calendar.date(byAdding: .day, value: -6, to: lastMonth)!, note: "上月交通"),
+            Transaction(amount: 350, category: .shopping, type: .expense, date: calendar.date(byAdding: .day, value: -8, to: lastMonth)!, note: "上月购物"),
+            Transaction(amount: 120, category: .entertainment, type: .expense, date: calendar.date(byAdding: .day, value: -12, to: lastMonth)!, note: "上月娱乐"),
+            Transaction(amount: 1200, category: .housing, type: .expense, date: calendar.date(byAdding: .day, value: -25, to: lastMonth)!, note: "上月房租")
         ]
     }
     
