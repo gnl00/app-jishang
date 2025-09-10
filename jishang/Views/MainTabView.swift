@@ -38,7 +38,7 @@ enum TabSelection: Int, CaseIterable {
 }
 
 struct MainTabView: View {
-    @StateObject private var transactionStore = TransactionStore()
+    @EnvironmentObject var transactionStore: TransactionStore
     
     var body: some View {
         TabView {
@@ -71,4 +71,5 @@ struct MainTabView: View {
 
 #Preview {
     MainTabView()
+        .environmentObject(TransactionStore())
 }

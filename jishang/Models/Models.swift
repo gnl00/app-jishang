@@ -149,6 +149,9 @@ class TransactionStore: ObservableObject {
     @Published var transactions: [Transaction] = []
     @Published var customCategories: [Category] = []
     
+    private let transactionsFileName = "transactions.json"
+    private let categoriesFileName = "custom_categories.json"
+    
     var allCategories: [Category] {
         return Category.predefinedCategories + customCategories
     }
@@ -158,7 +161,98 @@ class TransactionStore: ObservableObject {
     }
     
     init() {
-        loadSampleData()
+        loadPersistedData()
+    }
+    
+    // MARK: - Persistence Methods
+    
+    private var documentsDirectory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    
+    private var transactionsURL: URL {
+        documentsDirectory.appendingPathComponent(transactionsFileName)
+    }
+    
+    private var categoriesURL: URL {
+        documentsDirectory.appendingPathComponent(categoriesFileName)
+    }
+    
+    private func loadPersistedData() {
+        loadTransactions()
+        loadCustomCategories()
+        
+        // 如果没有持久化数据，加载示例数据
+        if transactions.isEmpty {
+            loadSampleData()
+            saveData() // 保存示例数据
+        }
+    }
+    
+    private func loadTransactions() {
+        do {
+            let data = try Data(contentsOf: transactionsURL)
+            transactions = try JSONDecoder().decode([Transaction].self, from: data)
+            print("✅ 成功加载 \(transactions.count) 条交易记录")
+        } catch {
+            print("⚠️ 加载交易记录失败: \(error)")
+            transactions = []
+        }
+    }
+    
+    private func loadCustomCategories() {
+        do {
+            let data = try Data(contentsOf: categoriesURL)
+            customCategories = try JSONDecoder().decode([Category].self, from: data)
+            print("✅ 成功加载 \(customCategories.count) 个自定义分类")
+        } catch {
+            print("⚠️ 加载自定义分类失败: \(error)")
+            customCategories = []
+        }
+    }
+    
+    private func saveTransactions() {
+        do {
+            let data = try JSONEncoder().encode(transactions)
+            try data.write(to: transactionsURL)
+            print("✅ 成功保存 \(transactions.count) 条交易记录")
+        } catch {
+            print("❌ 保存交易记录失败: \(error)")
+        }
+    }
+    
+    private func saveCustomCategories() {
+        do {
+            let data = try JSONEncoder().encode(customCategories)
+            try data.write(to: categoriesURL)
+            print("✅ 成功保存 \(customCategories.count) 个自定义分类")
+        } catch {
+            print("❌ 保存自定义分类失败: \(error)")
+        }
+    }
+    
+    private func saveData() {
+        saveTransactions()
+        saveCustomCategories()
+    }
+    
+    // MARK: - Public Methods for External Saving
+    
+    /// 手动保存所有数据
+    func saveAllData() {
+        saveData()
+    }
+    
+    /// 清除所有数据（用于测试或重置）
+    func clearAllData() {
+        transactions.removeAll()
+        customCategories.removeAll()
+        
+        // 删除本地文件
+        try? FileManager.default.removeItem(at: transactionsURL)
+        try? FileManager.default.removeItem(at: categoriesURL)
+        
+        print("✅ 已清除所有数据")
     }
     
     func addCustomCategory(name: String, icon: String, defaultType: TransactionType) {
@@ -169,10 +263,12 @@ class TransactionStore: ObservableObject {
             isCustom: true
         )
         customCategories.append(newCategory)
+        saveCustomCategories()
     }
     
     func removeCustomCategory(_ category: Category) {
         customCategories.removeAll { $0.id == category.id }
+        saveCustomCategories()
     }
     
     private func loadSampleData() {
@@ -195,16 +291,19 @@ class TransactionStore: ObservableObject {
     
     func addTransaction(_ transaction: Transaction) {
         transactions.append(transaction)
+        saveTransactions()
     }
     
     func updateTransaction(_ transaction: Transaction) {
         if let index = transactions.firstIndex(where: { $0.id == transaction.id }) {
             transactions[index] = transaction
+            saveTransactions()
         }
     }
     
     func deleteTransaction(_ transaction: Transaction) {
         transactions.removeAll { $0.id == transaction.id }
+        saveTransactions()
     }
     
     var totalIncome: Double {
