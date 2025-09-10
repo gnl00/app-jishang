@@ -44,7 +44,6 @@ struct StatisticsView: View {
                 }
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("统计分析")
             .navigationBarTitleDisplayMode(.inline)
         }
     }

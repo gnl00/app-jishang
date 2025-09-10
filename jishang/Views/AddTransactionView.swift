@@ -195,7 +195,7 @@ struct AddTransactionView: View {
                             // 使用 Pow 的过渡，插入时 Glare，移除时 Iris 从右上角收缩并淡出
                             .transition(
                                 .asymmetric(
-                                    insertion: .movingParts.glare(angle: .degrees(225)),
+                                    insertion: .movingParts.blinds(slatWidth: 12, style: .venetian, isStaggered: true),
                                     removal: .movingParts.iris(origin: .topTrailing, blurRadius: 1)
                                         .combined(with: .opacity)
                                 )

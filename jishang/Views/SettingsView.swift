@@ -76,8 +76,9 @@ struct SettingsView: View {
                 
                 Section {
                     VStack(alignment: .center, spacing: 8) {
-                        Text("记账本")
-                            .font(.system(size: 16, weight: .medium))
+                        Text("不如就记上一笔")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
                         
                         Text("版本 1.0.0")
                             .font(.system(size: 12))
@@ -87,7 +88,6 @@ struct SettingsView: View {
                     .listRowBackground(Color.clear)
                 }
             }
-            .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
