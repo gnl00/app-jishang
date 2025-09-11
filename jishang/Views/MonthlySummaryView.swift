@@ -1191,14 +1191,56 @@ struct MonthSwitcherView: View {
     private let periodOptions = ["本月", "上个月"]
     
     var body: some View {
-        Picker("Period", selection: $selectedPeriod) {
-            ForEach(0..<periodOptions.count, id: \.self) { index in
-                Text(periodOptions[index])
-                    .tag(index)
+        GeometryReader { geo in
+            let height: CGFloat = 32
+            let corner: CGFloat = 20
+            let bgColor = Color(.systemGray6)
+            let borderColor = Color(.systemGray5)
+            let count = max(periodOptions.count, 1)
+            let segmentWidth = geo.size.width / CGFloat(count)
+
+            ZStack(alignment: .leading) {
+                // Background with rounded corners
+                RoundedRectangle(cornerRadius: corner)
+                    .fill(bgColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: corner)
+                            .stroke(borderColor, lineWidth: 1)
+                    )
+
+                // Selector bar with rounded corners
+                RoundedRectangle(cornerRadius: corner)
+                    .fill(Color(.systemBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: corner)
+                            .stroke(borderColor, lineWidth: 1)
+                    )
+                    .frame(width: segmentWidth - 4, height: height - 4)
+                    .padding(2)
+                    .offset(x: CGFloat(selectedPeriod) * segmentWidth)
+                    .animation(.easeInOut(duration: 0.25), value: selectedPeriod)
+
+                // Segments
+                HStack(spacing: 0) {
+                    ForEach(0..<count, id: \.self) { index in
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selectedPeriod = index
+                            }
+                        }) {
+                            Text(periodOptions[index])
+                                .font(.system(size: 14, weight: selectedPeriod == index ? .semibold : .regular))
+                                .foregroundColor(selectedPeriod == index ? .primary : .secondary)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .frame(width: segmentWidth, height: height)
+                        .contentShape(Rectangle())
+                    }
+                }
             }
+            .frame(height: height)
         }
-        .pickerStyle(SegmentedPickerStyle())
-        .animation(.easeInOut(duration: 0.3), value: selectedPeriod)
+        .frame(height: 32)
         .padding(.top, 4)
     }
 }
