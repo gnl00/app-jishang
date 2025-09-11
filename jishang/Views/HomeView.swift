@@ -38,12 +38,13 @@ struct HomeView: View {
                     
                     // Monthly summary
                     MonthlySummaryView(store: transactionStore)
+                        .padding(.bottom, 8)
                 }
                 .padding(.top)
                 
                 // Category filter tab bar
                 CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
                     .background(Color(.systemGroupedBackground))
                 
                 // Transaction list

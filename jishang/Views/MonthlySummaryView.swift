@@ -85,7 +85,7 @@ struct HeaderSectionView: View {
     var body: some View {
         HStack(spacing: 12) {
             Text("月度总览")
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.primary)
             
             Spacer()
@@ -95,7 +95,7 @@ struct HeaderSectionView: View {
             }) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.gray)
             }
         }
         .padding(.vertical, 2)
@@ -391,19 +391,45 @@ struct ScrollableBarChartView: View {
                     .foregroundColor(.secondary)
                     .frame(height: 200)
             } else {
-                TabView(selection: $currentPage) {
-                    ForEach(0..<pageCount, id: \.self) { page in
-                        BarChartPageView(
-                            chartData: Array(chartData[pageRange(page)]),
-                            selectedDate: $selectedDate,
-                            maxValue: maxValue,
-                            barSpacing: barSpacing,
-                            calendar: calendar
-                        )
-                        .tag(page)
+                GeometryReader { geometry in
+                    let axisWidth: CGFloat = 38
+                    let axisSpacing: CGFloat = 6
+                    let pageHeight: CGFloat = 200
+                    let chartHeight: CGFloat = 160
+                    let barsAreaWidth = max(0, geometry.size.width - axisWidth - axisSpacing)
+
+                    HStack(alignment: .bottom, spacing: axisSpacing) {
+                        // Gridlines overlay + paged bars region (left)
+                        ZStack(alignment: .bottomLeading) {
+                            YAxisGridLines(tickCount: 4)
+                                .frame(height: chartHeight)
+                                .padding(.bottom, pageHeight - chartHeight)
+                                .allowsHitTesting(false)
+
+                            TabView(selection: $currentPage) {
+                                ForEach(0..<pageCount, id: \.self) { displayIndex in
+                                    let internalPage = lastPageIndex - displayIndex
+                                    BarChartPageView(
+                                        chartData: Array(chartData[pageRange(internalPage)]),
+                                        selectedDate: $selectedDate,
+                                        maxValue: maxValue,
+                                        barSpacing: barSpacing,
+                                        calendar: calendar
+                                    )
+                                    .tag(displayIndex)
+                                }
+                            }
+                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                            .frame(height: pageHeight)
+                        }
+                        .frame(width: barsAreaWidth, height: pageHeight, alignment: .bottom)
+
+                        // Fixed Y Axis (right) — align baseline with X-axis
+                        YAxisView(maxValue: maxValue, tickCount: 4)
+                            .frame(width: axisWidth, height: chartHeight, alignment: .bottom)
+                            .padding(.bottom, pageHeight - chartHeight)
                     }
                 }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 .frame(height: 200)
             }
 
@@ -423,18 +449,6 @@ struct ScrollableBarChartView: View {
             currentPage = lastPageIndex
         }
     }
-    
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日"
-        return formatter.string(from: date)
-    }
-    
-    private func formatDateLabel(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd"
-        return formatter.string(from: date).lowercased()
-    }
 }
 
 // MARK: - BarChartPageView
@@ -445,22 +459,54 @@ struct BarChartPageView: View {
     let barSpacing: CGFloat
     let calendar: Calendar
     
+    private func formatDateLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: date)
+    }
+    
     var body: some View {
         GeometryReader { geometry in
+            let pageHeight: CGFloat = 200
+            let chartHeight: CGFloat = 160
+            let axisThickness: CGFloat = 1
+            let labelsHeight: CGFloat = pageHeight - chartHeight - axisThickness
             let totalSpacing = barSpacing * max(0, CGFloat(chartData.count - 1))
             let availableWidth = geometry.size.width - totalSpacing
-            let barWidth = chartData.isEmpty ? 0 : availableWidth / CGFloat(chartData.count)
-            
-            HStack(spacing: barSpacing) {
-                ForEach(chartData, id: \.id) { datum in
-                    BarItemView(
-                        datum: datum,
-                        selectedDate: $selectedDate,
-                        maxValue: maxValue,
-                        barWidth: barWidth,
-                        calendar: calendar
-                    )
+            let barWidth = chartData.isEmpty ? 0 : max(0, availableWidth / CGFloat(chartData.count))
+
+            VStack(spacing: 0) {
+                // Bars area aligned to bottom of chart
+                HStack(spacing: barSpacing) {
+                    ForEach(chartData, id: \.id) { datum in
+                        BarItemView(
+                            datum: datum,
+                            selectedDate: $selectedDate,
+                            maxValue: maxValue,
+                            barWidth: barWidth,
+                            calendar: calendar
+                        )
+                    }
                 }
+                .frame(height: chartHeight, alignment: .bottom)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+
+                // X Axis line
+                Rectangle()
+                    .fill(Color(.systemGray5))
+                    .frame(height: axisThickness)
+
+                // Date labels aligned under the bars (format: M/d)
+                HStack(spacing: barSpacing) {
+                    ForEach(chartData, id: \.id) { datum in
+                        let isToday = calendar.isDateInToday(datum.date)
+                        Text(formatDateLabel(datum.date))
+                            .font(.system(size: 10, weight: isToday ? .semibold : .regular))
+                            .foregroundColor(isToday ? .primary : .secondary)
+                            .frame(width: barWidth)
+                    }
+                }
+                .frame(height: labelsHeight)
             }
         }
         .frame(height: 200)
@@ -485,52 +531,117 @@ struct BarItemView: View {
     }
     
     var body: some View {
-        VStack(spacing: 4) {
-            // Chart area with bottom alignment
-            VStack {
-                Spacer() // This pushes the bars to the bottom
-                
-                VStack(spacing: 2) {
-                    // Income bar (if any)
-                    if datum.income > 0 {
-                        IncomeBarView(
-                            income: datum.income,
-                            maxValue: maxValue,
-                            isToday: isToday,
-                            isSelected: isSelected
-                        )
-                    }
-                    
-                    // Expense bar (if any)
-                    if datum.expense > 0 {
-                        ExpenseBarView(
-                            expense: datum.expense,
-                            maxValue: maxValue,
-                            isToday: isToday,
-                            isSelected: isSelected
-                        )
-                    } else if datum.income == 0 {
-                        // Empty state when no data
-                        EmptyBarView()
-                    }
+        // Two-column bars per day (expense left, income right)
+        let maxBarHeight: CGFloat = 160
+        let innerSpacing: CGFloat = min(4, barWidth * 0.25)
+        let halfWidth: CGFloat = max(1, (barWidth - innerSpacing) / 2)
+        let expenseRatio = maxValue > 0 ? datum.expense / maxValue : 0
+        let incomeRatio  = maxValue > 0 ? datum.income  / maxValue : 0
+        let expenseHeight = max(4, CGFloat(expenseRatio) * maxBarHeight)
+        let incomeHeight  = max(4, CGFloat(incomeRatio)  * maxBarHeight)
+        
+        // Keep existing color logic (selected > today > normal)
+        let expenseColor: Color = isSelected ? Color.red.opacity(0.9) : (isToday ? Color.red.opacity(0.7) : Color.red.opacity(0.5))
+        let incomeColor: Color  = isSelected ? Color.blue.opacity(0.9) : (isToday ? Color.blue.opacity(0.7) : Color.blue.opacity(0.5))
+        
+        return HStack(spacing: innerSpacing) {
+            // Expense (left)
+            ZStack(alignment: .bottom) {
+                if datum.expense > 0 {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(expenseColor)
+                        .frame(width: halfWidth, height: expenseHeight)
+                } else {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: halfWidth, height: 4)
                 }
             }
-            .frame(width: barWidth, height: 160)
-            .onTapGesture {
-                selectedDate = datum.date
-            }
+            .frame(width: halfWidth, height: maxBarHeight, alignment: .bottom)
             
-            // Date label
-            Text(formatDateLabel(datum.date))
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+            // Income (right)
+            ZStack(alignment: .bottom) {
+                if datum.income > 0 {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(incomeColor)
+                        .frame(width: halfWidth, height: incomeHeight)
+                } else {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: halfWidth, height: 4)
+                }
+            }
+            .frame(width: halfWidth, height: maxBarHeight, alignment: .bottom)
         }
+        .frame(width: barWidth, height: maxBarHeight, alignment: .bottom)
+        .contentShape(Rectangle())
+        .onTapGesture { selectedDate = datum.date }
+        .accessibilityLabel("\(formatDate(datum.date))")
+        .accessibilityValue("支出: \(String(format: "%.2f", datum.expense)), 收入: \(String(format: "%.2f", datum.income))")
     }
     
-    private func formatDateLabel(_ date: Date) -> String {
+    private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd"
-        return formatter.string(from: date).lowercased()
+        formatter.dateFormat = "M月d日"
+        return formatter.string(from: date)
+    }
+    
+}
+
+// MARK: - Y Axis + Gridlines
+struct YAxisView: View {
+    let maxValue: Double
+    let tickCount: Int
+    
+    private func axisLabel(_ value: Double) -> String {
+        let nf = NumberFormatter()
+        nf.numberStyle = .decimal
+        nf.maximumFractionDigits = 0
+        let text = nf.string(from: NSNumber(value: max(0, value))) ?? "0"
+        return "¥" + text
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            // Vertical baseline on the LEFT of numbers
+            Rectangle()
+                .fill(Color(.systemGray5))
+                .frame(width: 1)
+                .frame(maxHeight: .infinity)
+
+            // Tick labels stacked vertically
+            VStack(spacing: 0) {
+                ForEach(0...tickCount, id: \.self) { i in
+                    let value = maxValue * Double(tickCount - i) / Double(tickCount)
+                    HStack {
+                        Text(axisLabel(value))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if i < tickCount { Spacer(minLength: 0) }
+                }
+            }
+        }
+        .padding(.leading, 2)
+    }
+}
+
+struct YAxisGridLines: View {
+    let tickCount: Int
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Draw gridlines for tick levels above baseline to avoid double-drawing X-axis
+            ForEach(0..<tickCount, id: \.self) { i in
+                Rectangle()
+                    .fill(Color(.systemGray5))
+                    .frame(height: 1)
+                Spacer(minLength: 0)
+            }
+        }
     }
 }
 
@@ -703,11 +814,11 @@ struct MonthlyOverviewView: View {
                 HStack {
                     Text("本月总收入:")
                         .font(.system(size: 14))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.brown)
                     Spacer()
                     Text("¥\(String(format: "%.2f", income))")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.primary)
+                        .foregroundColor(.secondary)
                 }
                 
                 HStack {
@@ -754,11 +865,60 @@ struct ConsumptionTrendView: View {
     let selectedMonth: Date
     @Binding var selectedDate: Date?
     
+    private var calendar: Calendar { Calendar.current }
+    
+    private var defaultDisplayDate: Date {
+        // 当前月显示今天，否则显示该月最后一天
+        if calendar.isDate(selectedMonth, equalTo: Date(), toGranularity: .month) {
+            return calendar.startOfDay(for: Date())
+        } else {
+            let startOfMonth = calendar.startOfMonth(for: selectedMonth)
+            let range = calendar.range(of: .day, in: .month, for: selectedMonth) ?? 1..<32
+            let lastDay = range.count
+            let lastDate = calendar.date(byAdding: .day, value: lastDay - 1, to: startOfMonth) ?? selectedMonth
+            return calendar.startOfDay(for: lastDate)
+        }
+    }
+    
+    private var displayDate: Date { selectedDate.map(calendar.startOfDay(for:)) ?? defaultDisplayDate }
+    
+    private var dayIncome: Double {
+        let day = displayDate
+        return store.transactions
+            .filter { $0.type == .income && calendar.isDate($0.date, inSameDayAs: day) }
+            .reduce(0) { $0 + $1.amount }
+    }
+    
+    private var dayExpense: Double {
+        let day = displayDate
+        return store.transactions
+            .filter { $0.type == .expense && calendar.isDate($0.date, inSameDayAs: day) }
+            .reduce(0) { $0 + $1.amount }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("📊 消费趋势")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.primary)
+            
+            // 选中/默认日期的当日支出与收入
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 6) {
+                    Circle().fill(Color.blue.opacity(0.9)).frame(width: 6, height: 6)
+                    Text("收入: ¥\(String(format: "%.2f", dayIncome))")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                HStack(spacing: 6) {
+                    Circle().fill(Color.red.opacity(0.9)).frame(width: 6, height: 6)
+                    Text("支出: ¥\(String(format: "%.2f", dayExpense))")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.bottom, 2)
             
             ScrollableBarChartView(store: store, selectedMonth: selectedMonth, selectedDate: $selectedDate)
                 .frame(height: 260)
@@ -932,10 +1092,9 @@ struct IncomeDetailsView: View {
                 .fill(Color(.systemBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(.systemGray5), lineWidth: 1)
+                        .stroke(Color(.systemGray6), lineWidth: 1)
                 )
         )
-        // Removed Pow changeEffect to avoid overlapping per-frame updates
     }
 }
 
