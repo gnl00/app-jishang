@@ -149,62 +149,76 @@ struct DailyExpenseChartView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Header card
-            VStack(alignment: .leading, spacing: 12) {
+        NavigationView {
+            VStack(spacing: 16) {
+                // Header
                 HStack {
                     Text("月度消费数据")
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.primary)
                     Spacer()
-                    Text(formatMonthYYYYMM(Date()))
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundColor(.secondary)
+                }
+                .padding(.top)
+                Spacer()
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("月度余额")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Text(formatMonthYYYYMM(Date()))
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Monthly total expense in big rolling number
+                    RollingNumberView(
+                        value: store.monthlyIncome(for: Date()) - store.monthlyExpense(for: Date()),
+                        font: .system(size: 28, weight: .semibold, design: .rounded),
+                        textColor: .primary,
+                        prefix: "¥ ",
+                        showDecimals: false,
+                        digitWidth: 18,
+                        decimalPointWidth: 10,
+                        separatorWidth: 10,
+                        currencyUnitWidth: 18
+                    )
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(.systemGray5), lineWidth: 1)
+                        )
+                )
+                
+                if !hasAnyExpense {
+                    VStack(spacing: 12) {
+                        Image(systemName: "chart.bar")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray.opacity(0.5))
+                        Text("暂无支出数据")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    // Seven-day paged bar chart (last 7 days from today, swipe right for earlier)
+                    ScrollableBarChartView(store: store)
+                        .frame(height: 260)
+                        .padding(.vertical, 4)
                 }
                 
-                // Monthly total expense in big rolling number
-                RollingNumberView(
-                    value: store.monthlyIncome(for: Date()) - store.monthlyExpense(for: Date()),
-                    font: .system(size: 28, weight: .semibold, design: .rounded),
-                    textColor: .primary,
-                    prefix: "¥ ",
-                    showDecimals: false,
-                    digitWidth: 18,
-                    decimalPointWidth: 10,
-                    separatorWidth: 10,
-                    currencyUnitWidth: 18
-                )
+                Spacer()
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.clear)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(.systemGray5), lineWidth: 1)
-                    )
-            )
-            
-            if !hasAnyExpense {
-                VStack(spacing: 12) {
-                    Image(systemName: "chart.bar")
-                        .font(.system(size: 48))
-                        .foregroundColor(.gray.opacity(0.5))
-                    Text("暂无支出数据")
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
-            } else {
-                // Seven-day paged bar chart (last 7 days from today, swipe right for earlier)
-                ScrollableBarChartView(store: store)
-                .frame(height: 260)
-                .padding(.vertical, 4)
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
+            .background(Color(.systemBackground))
+            .navigationBarHidden(true)
         }
-        .padding()
-        .background(Color(.systemBackground))
     }
 }
 
@@ -434,8 +448,7 @@ struct ScrollableBarChartView: View {
     
     private func formatDateLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        formatter.locale = Locale(identifier: "en_US")
+        formatter.dateFormat = "MM/dd"
         return formatter.string(from: date).lowercased()
     }
 }
