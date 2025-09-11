@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct AddCategoryView: View {
     @ObservedObject var store: TransactionStore
@@ -15,6 +16,8 @@ struct AddCategoryView: View {
     
     @State private var categoryName: String = ""
     @State private var categoryIcon: String = "📝"
+    @State private var customIcon: String = ""
+    @State private var isUsingCustomIcon: Bool = false
     @FocusState private var isNameFocused: Bool
     
     private let defaultIcons = [
@@ -59,19 +62,72 @@ struct AddCategoryView: View {
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.secondary)
                         
+                        // Custom Icon Input
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                TextField("输入自定义图标 (emoji)", text: $customIcon)
+                                    .font(.system(size: 16))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(8)
+                                    .onChange(of: customIcon) { oldValue, newValue in
+                                        if !newValue.isEmpty {
+                                            isUsingCustomIcon = true
+                                            categoryIcon = newValue
+                                        }
+                                    }
+                                
+                                if !customIcon.isEmpty {
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            customIcon = ""
+                                            isUsingCustomIcon = false
+                                            categoryIcon = "📝"
+                                        }
+                                    }) {
+                                        VStack(spacing: 2) {
+                                            Image(systemName: "xmark.circle")
+                                                .font(.system(size: 16))
+                                                .foregroundColor(.red)
+                                            
+                                            Text("清除")
+                                                .font(.system(size: 8, weight: .medium))
+                                                .foregroundColor(.red)
+                                                .lineLimit(1)
+                                        }
+                                        .frame(width: 40, height: 40)
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(8)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.bottom, 8)
+                        
+                        Text("或选择预设图标")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                        
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
                             ForEach(defaultIcons, id: \.self) { icon in
                                 Button(action: {
                                     categoryIcon = icon
+                                    customIcon = ""
+                                    isUsingCustomIcon = false
                                 }) {
                                     Text(icon)
                                         .font(.system(size: 24))
                                         .frame(width: 50, height: 50)
-                                        .background(categoryIcon == icon ? Color.blue.opacity(0.1) : Color(.systemGray6))
+                                        .background(!isUsingCustomIcon && categoryIcon == icon ? Color.blue.opacity(0.1) : Color(.systemGray6))
                                         .cornerRadius(12)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .stroke(categoryIcon == icon ? Color.blue : Color.clear, lineWidth: 2)
+                                                .stroke(!isUsingCustomIcon && categoryIcon == icon ? Color.blue : Color.clear, lineWidth: 2)
                                         )
                                 }
                             }
@@ -108,6 +164,8 @@ struct AddCategoryView: View {
                     .cornerRadius(12)
                     
                     Button("保存") {
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
                         saveCategoryAndSelect()
                     }
                     .font(.system(size: 16, weight: .semibold))
@@ -124,9 +182,21 @@ struct AddCategoryView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
+            resetFormState()
             isNameFocused = true
         }
+        .onDisappear {
+            resetFormState()
+        }
     }
+    
+    private func resetFormState() {
+        categoryName = ""
+        categoryIcon = "📝"
+        customIcon = ""
+        isUsingCustomIcon = false
+    }
+    
     
     private func saveCategoryAndSelect() {
         let trimmedName = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)

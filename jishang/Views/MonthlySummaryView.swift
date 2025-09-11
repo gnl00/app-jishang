@@ -814,11 +814,11 @@ struct MonthlyOverviewView: View {
                 HStack {
                     Text("本月总收入:")
                         .font(.system(size: 14))
-                        .foregroundColor(.brown)
+                        .foregroundColor(.secondary)
                     Spacer()
                     Text("¥\(String(format: "%.2f", income))")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.brown)
                 }
                 
                 HStack {
