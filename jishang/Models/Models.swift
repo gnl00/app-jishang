@@ -55,18 +55,38 @@ struct Category: Identifiable, Codable, Hashable {
         return name
     }
     
+    // 使用稳定的、跨版本一致的 UUID，避免每次安装随机生成导致的匹配失败
+    private static let predefinedIDs: [String: String] = [
+        "餐饮": "11111111-1111-1111-1111-111111111111",
+        "交通": "22222222-2222-2222-2222-222222222222",
+        "购物": "33333333-3333-3333-3333-333333333333",
+        "娱乐": "44444444-4444-4444-4444-444444444444",
+        "医疗": "55555555-5555-5555-5555-555555555555",
+        "教育": "66666666-6666-6666-6666-666666666666",
+        "住房": "77777777-7777-7777-7777-777777777777",
+        "工资": "88888888-8888-8888-8888-888888888888",
+        "奖金": "99999999-9999-9999-9999-999999999999",
+        "投资": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "其他": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    ]
+
+    private static func stableId(for name: String) -> UUID {
+        if let s = predefinedIDs[name], let u = UUID(uuidString: s) { return u }
+        return UUID()
+    }
+
     static let predefinedCategories: [Category] = [
-        Category(name: "餐饮", icon: "🍽️", defaultType: .expense),
-        Category(name: "交通", icon: "🚗", defaultType: .expense),
-        Category(name: "购物", icon: "🛍️", defaultType: .expense),
-        Category(name: "娱乐", icon: "🎬", defaultType: .expense),
-        Category(name: "医疗", icon: "🏥", defaultType: .expense),
-        Category(name: "教育", icon: "📚", defaultType: .expense),
-        Category(name: "住房", icon: "🏠", defaultType: .expense),
-        Category(name: "工资", icon: "💼", defaultType: .income),
-        Category(name: "奖金", icon: "🎁", defaultType: .income),
-        Category(name: "投资", icon: "📈", defaultType: .income),
-        Category(name: "其他", icon: "📝", defaultType: .expense)
+        Category(id: stableId(for: "餐饮"), name: "餐饮", icon: "🍽️", defaultType: .expense),
+        Category(id: stableId(for: "交通"), name: "交通", icon: "🚗", defaultType: .expense),
+        Category(id: stableId(for: "购物"), name: "购物", icon: "🛍️", defaultType: .expense),
+        Category(id: stableId(for: "娱乐"), name: "娱乐", icon: "🎬", defaultType: .expense),
+        Category(id: stableId(for: "医疗"), name: "医疗", icon: "🏥", defaultType: .expense),
+        Category(id: stableId(for: "教育"), name: "教育", icon: "📚", defaultType: .expense),
+        Category(id: stableId(for: "住房"), name: "住房", icon: "🏠", defaultType: .expense),
+        Category(id: stableId(for: "工资"), name: "工资", icon: "💼", defaultType: .income),
+        Category(id: stableId(for: "奖金"), name: "奖金", icon: "🎁", defaultType: .income),
+        Category(id: stableId(for: "投资"), name: "投资", icon: "📈", defaultType: .income),
+        Category(id: stableId(for: "其他"), name: "其他", icon: "📝", defaultType: .expense)
     ]
     
     // 为了保持向后兼容性，提供一些便捷的静态属性
@@ -162,6 +182,8 @@ class TransactionStore: ObservableObject {
     
     init() {
         loadPersistedData()
+        // 迁移：将交易中的预置分类标准化为稳定ID，避免跨版本丢失映射
+        normalizePredefinedCategoriesInTransactions()
     }
     
     // MARK: - Persistence Methods
@@ -234,6 +256,26 @@ class TransactionStore: ObservableObject {
     private func saveData() {
         saveTransactions()
         saveCustomCategories()
+    }
+
+    // 将旧版本中使用的随机ID预置分类，映射为当前版本的稳定ID对象（按名称匹配）
+    private func normalizePredefinedCategoriesInTransactions() {
+        var changed = false
+        for i in transactions.indices {
+            let t = transactions[i]
+            // 仅处理非自定义分类
+            if !t.category.isCustom {
+                if let canonical = Category.predefinedCategories.first(where: { $0.name == t.category.name && $0.defaultType == t.category.defaultType }) {
+                    if t.category.id != canonical.id {
+                        transactions[i].category = canonical
+                        changed = true
+                    }
+                }
+            }
+        }
+        if changed {
+            saveTransactions()
+        }
     }
     
     // MARK: - Public Methods for External Saving

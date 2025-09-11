@@ -87,7 +87,14 @@ struct AddTransactionView: View {
             if let editing = initialTransaction {
                 // 编辑模式：预填充数据
                 amount = String(editing.amount)
-                selectedCategory = editing.category
+                // 优先使用当前store中的同ID分类；否则退化为按名称和类型匹配，确保高亮
+                if let matchById = store.allCategories.first(where: { $0.id == editing.category.id }) {
+                    selectedCategory = matchById
+                } else if let matchByName = store.allCategories.first(where: { $0.name == editing.category.name && $0.defaultType == editing.type }) {
+                    selectedCategory = matchByName
+                } else {
+                    selectedCategory = editing.category
+                }
                 note = editing.note
                 date = editing.date
             } else {
