@@ -36,14 +36,15 @@ struct HomeView: View {
                         }
                     )
                     
-                    // Monthly statistics
-                    MonthlyStatisticsView(store: transactionStore)
+                    // Monthly summary
+                    MonthlySummaryView(store: transactionStore)
                 }
                 .padding(.top)
                 
                 // Category filter tab bar
                 CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
                     .padding(.vertical, 8)
+                    .background(Color(.systemGroupedBackground))
                 
                 // Transaction list
                 TransactionListView(
@@ -52,7 +53,7 @@ struct HomeView: View {
                 )
                 .background(Color(.systemGroupedBackground))
             }
-            .background(Color(.systemGroupedBackground))
+            // .background(Color(.systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $presentedTransactionType) { type in
                 AddTransactionView(
