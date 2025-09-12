@@ -24,23 +24,10 @@ struct TransactionListView: View {
     
     var body: some View {
         List(filteredTransactions) { transaction in
-            TransactionRowView(transaction: transaction)
-                .transition(.slide)
-                .opacity(deletingTransactionId == transaction.id ? 0.3 : 1.0)
-                .scaleEffect(deletingTransactionId == transaction.id ? 0.8 : 1.0)
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button("删除", role: .destructive) {
-                        store.deleteTransaction(transaction)
-                    }
-                }
-                .swipeActions(edge: .leading) {
-                    Button("编辑") {
-                        editingTransaction = transaction
-                    }
-                    .tint(.blue)
-                }
+            transactionRow(for: transaction)
         }
         .listStyle(.plain)
+        .scrollIndicators(.hidden)
         .sheet(item: $editingTransaction) { transaction in
             AddTransactionView(
                 store: store,
@@ -50,6 +37,48 @@ struct TransactionListView: View {
             )
         }
     }
+    
+    @ViewBuilder
+    private func transactionRow(for transaction: Transaction) -> some View {
+        TransactionRowView(transaction: transaction)
+            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .transition(.asymmetric(
+                insertion: .scale.combined(with: .opacity),
+                removal: .scale(scale: 0.8).combined(with: .opacity)
+            ))
+            .opacity(deletingTransactionId == transaction.id ? 0.3 : 1.0)
+            .scaleEffect(deletingTransactionId == transaction.id ? 0.8 : 1.0)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: deletingTransactionId)
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                deleteButton(for: transaction)
+            }
+            .swipeActions(edge: .leading) {
+                editButton(for: transaction)
+            }
+    }
+    
+    @ViewBuilder
+    private func deleteButton(for transaction: Transaction) -> some View {
+        Button("删除", role: .destructive) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                deletingTransactionId = transaction.id
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                store.deleteTransaction(transaction)
+                deletingTransactionId = nil
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func editButton(for transaction: Transaction) -> some View {
+        Button("编辑") {
+            editingTransaction = transaction
+        }
+        .tint(.blue)
+    }
 }
 
 struct TransactionRowView: View {
@@ -58,54 +87,173 @@ struct TransactionRowView: View {
     
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
-        formatter.dateFormat = "YYYY/MM/dd"
+        formatter.dateFormat = "MM/dd"
         return formatter
     }
     
+    // 卡片背景颜色
+    private var cardBackgroundColor: Color {
+        if transaction.type == .income {
+            return Color.green.opacity(0.05)
+        } else {
+            return Color.red.opacity(0.05)
+        }
+    }
+    
+    // 卡片边框颜色
+    private var cardBorderColor: Color {
+        if transaction.type == .income {
+            return Color.green.opacity(0.2)
+        } else {
+            return Color.red.opacity(0.2)
+        }
+    }
+    
+    // 金额颜色
+    private var amountColor: Color {
+        transaction.type == .income ? Color.green : Color.red
+    }
+    
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(transaction.category.icon)
-                        .font(.system(size: 18))
+        HStack(spacing: 16) {
+            // 左侧：图标和分类信息
+            HStack(spacing: 12) {
+                // 图标容器
+                ZStack {
+                    Circle()
+                        .fill(cardBorderColor.opacity(0.3))
+                        .frame(width: 44, height: 44)
                     
+                    Text(transaction.category.icon)
+                        .font(.system(size: 20))
+                }
+                
+                // 分类和备注信息
+                VStack(alignment: .leading, spacing: 4) {
                     Text(transaction.category.rawValue)
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.primary)
                     
-                    Spacer()
-                }
-                
-                if !transaction.note.isEmpty {
-                    Text(transaction.note)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .transition(.slide.combined(with: .opacity))
+                    if !transaction.note.isEmpty {
+                        Text(transaction.note)
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        // 占位空间，保持布局一致性
+                        Text(" ")
+                            .font(.system(size: 13))
+                            .opacity(0)
+                    }
                 }
             }
             
-            Spacer()
+            Spacer(minLength: 8)
             
+            // 右侧：金额和日期
             VStack(alignment: .trailing, spacing: 4) {
                 Text("\(transaction.type == .income ? "+" : "-")\(transaction.amount.currencyFormatted)")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundColor(transaction.type == .income ? .green : .red)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundColor(amountColor)
                 
-                Text(dateFormatter.string(from: transaction.date))
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                    
+                    Text(dateFormatter.string(from: transaction.date))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .padding(.vertical, 4)
-        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .padding(16)
+        .background(
+            ZStack {
+                // 主背景：白色卡片
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemBackground))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(.systemGray5), lineWidth: 1)
+                    )
+                
+                // 左上角三角形背景色 (较淡)
+                VStack {
+                    HStack {
+                        TriangleCornerTopLeft(color: cardBorderColor.opacity(0.3))
+                            .frame(width: 32, height: 32)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                
+                // 右下角三角形背景色 (较深)
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        TriangleCornerBottomRight(color: cardBorderColor)
+                            .frame(width: 32, height: 32)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        )
+        .scaleEffect(isPressed ? 0.97 : 1.0)
+        .shadow(
+            color: Color.black.opacity(isPressed ? 0.1 : 0.05),
+            radius: isPressed ? 8 : 4,
+            x: 0,
+            y: isPressed ? 4 : 2
+        )
         .onTapGesture {
-            isPressed.toggle()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isPressed = false
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isPressed = false
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: isPressed)
+    }
+}
+
+// MARK: - Triangle Corner Shapes
+
+/// 左上角三角形
+struct TriangleCornerTopLeft: View {
+    let color: Color
+    
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            path.move(to: CGPoint(x: 0, y: 0))           // 左上角
+            path.addLine(to: CGPoint(x: size.width, y: 0)) // 右上角
+            path.addLine(to: CGPoint(x: 0, y: size.height)) // 左下角
+            path.closeSubpath()
+            
+            context.fill(path, with: .color(color))
+        }
+    }
+}
+
+/// 右下角三角形
+struct TriangleCornerBottomRight: View {
+    let color: Color
+    
+    var body: some View {
+        Canvas { context, size in
+            var path = Path()
+            path.move(to: CGPoint(x: size.width, y: 0))    // 右上角
+            path.addLine(to: CGPoint(x: size.width, y: size.height)) // 右下角
+            path.addLine(to: CGPoint(x: 0, y: size.height)) // 左下角
+            path.closeSubpath()
+            
+            context.fill(path, with: .color(color))
+        }
     }
 }
 
