@@ -553,4 +553,22 @@ class TransactionStore: ObservableObject {
         
         return dailyTotals
     }
+    
+    /// 获取指定日期的收入总额
+    func dailyIncome(for date: Date) -> Double {
+        let calendar = Calendar.current
+        let normalizedDate = calendar.startOfDay(for: date)
+        return transactions.filter { transaction in
+            calendar.isDate(transaction.date, inSameDayAs: normalizedDate) && transaction.type == .income
+        }.reduce(0) { $0 + $1.amount }
+    }
+    
+    /// 获取指定日期的支出总额
+    func dailyExpense(for date: Date) -> Double {
+        let calendar = Calendar.current
+        let normalizedDate = calendar.startOfDay(for: date)
+        return transactions.filter { transaction in
+            calendar.isDate(transaction.date, inSameDayAs: normalizedDate) && transaction.type == .expense
+        }.reduce(0) { $0 + $1.amount }
+    }
 }

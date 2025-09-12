@@ -39,6 +39,18 @@ struct MonthlyStatisticsView: View {
         self.monthDate = monthDate
         let calendar = Calendar.current
         self._selectedMonth = State(initialValue: calendar.startOfMonth(for: monthDate))
+        
+        // 设置默认选中日期为当日（如果当日在选中月份内）
+        let today = Date()
+        let todayNormalized = calendar.startOfDay(for: today)
+        let selectedMonthStart = calendar.startOfMonth(for: monthDate)
+        let selectedMonthEnd = calendar.endOfMonth(for: monthDate)
+        
+        if todayNormalized >= selectedMonthStart && todayNormalized <= selectedMonthEnd {
+            self._selectedDate = State(initialValue: todayNormalized)
+        } else {
+            self._selectedDate = State(initialValue: nil)
+        }
     }
     
     private var calendar: Calendar { Calendar.current }
@@ -423,6 +435,35 @@ struct ConsumptionTrendView: View {
         store.monthlyExpense(for: selectedMonth)
     }
     
+    // 获取显示日期（选中日期或当日）
+    private var displayDate: Date {
+        if let selectedDate = selectedDate {
+            return selectedDate
+        } else {
+            // 默认显示当日，如果当日不在选中月份内则显示月份第一天
+            let today = Date()
+            let todayNormalized = calendar.startOfDay(for: today)
+            let selectedMonthStart = calendar.startOfMonth(for: selectedMonth)
+            let selectedMonthEnd = calendar.endOfMonth(for: selectedMonth)
+            
+            if todayNormalized >= selectedMonthStart && todayNormalized <= selectedMonthEnd {
+                return todayNormalized
+            } else {
+                return selectedMonthStart
+            }
+        }
+    }
+    
+    // 选中日期或当日的收入
+    private var displayIncome: Double {
+        store.dailyIncome(for: displayDate)
+    }
+    
+    // 选中日期或当日的支出
+    private var displayExpense: Double {
+        store.dailyExpense(for: displayDate)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with mode toggle
@@ -471,7 +512,7 @@ struct ConsumptionTrendView: View {
                             )
                         )
                         .frame(width: 8, height: 8)
-                    Text("收入: \(currentMonthIncome.currencyFormattedInt)")
+                    Text("收入: \(displayIncome.currencyFormattedInt)")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
@@ -488,7 +529,7 @@ struct ConsumptionTrendView: View {
                             )
                         )
                         .frame(width: 8, height: 8)
-                    Text("支出: \(currentMonthExpense.currencyFormattedInt)")
+                    Text("支出: \(displayExpense.currencyFormattedInt)")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
