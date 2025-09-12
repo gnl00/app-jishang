@@ -8,6 +8,7 @@
 import SwiftUI
 import Speech
 import AVFoundation
+import UIKit
 
 struct VoiceInputView: View {
     @Binding var isPresented: Bool
@@ -127,19 +128,32 @@ struct VoiceInputView: View {
                 }
                 
                 // 操作按钮
-                HStack(spacing: 20) {
+                HStack(spacing: 16) {
                     Button("取消") {
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
                         isPresented = false
                     }
+                    .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(12)
                     
                     Button("确认") {
+                        let generator = UINotificationFeedbackGenerator()
+                        generator.notificationOccurred(.success)
                         onVoiceResult(voiceRecognizer.recognizedText)
                         isPresented = false
                     }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(voiceRecognizer.recognizedText.isEmpty ? Color.gray : Color.blue)
+                    .cornerRadius(12)
                     .disabled(voiceRecognizer.recognizedText.isEmpty)
-                    .foregroundColor(voiceRecognizer.recognizedText.isEmpty ? .secondary : .blue)
-                    .fontWeight(.semibold)
                 }
                 .padding(.bottom)
             }
