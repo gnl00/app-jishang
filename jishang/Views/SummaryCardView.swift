@@ -80,7 +80,9 @@ struct SummaryCardsView: View {
     let onVoiceExpenseAction: (() -> Void)?
     let onVoiceIncomeAction: (() -> Void)?
     
-    init(onExpenseAction: @escaping () -> Void, 
+    @State private var todayTransactionCount: Int = 3 // TODO: 从实际数据获取
+    
+    init(onExpenseAction: @escaping () -> Void,
          onIncomeAction: @escaping () -> Void,
          onVoiceExpenseAction: (() -> Void)? = nil,
          onVoiceIncomeAction: (() -> Void)? = nil) {
@@ -91,15 +93,21 @@ struct SummaryCardsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Header
+        VStack(spacing: 16) {
+            // Header with stats
             HStack {
-                Text("💰 快速记账")
+                Text("💰 记账中心")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
+                Text("今日第 \(todayTransactionCount) 笔")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
             }
-            
             // Action Cards
             HStack(spacing: 12) {
                 // Income Card - 收入：箭头向下（钱流入账户）

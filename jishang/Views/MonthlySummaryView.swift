@@ -40,108 +40,112 @@ struct MonthlySummaryView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
-            // Section 1: Header with title and buttons
-            HeaderSectionView(isExpanded: $isExpanded) {
-                showDailyExpenseDetails = true
+        VStack(spacing: 0) {
+            // Header - 简化设计，与SummaryCardsView呼应
+            HStack {
+                Text("月度总览")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button(action: {
+                    showDailyExpenseDetails = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("详情")
+                            .font(.system(size: 14, weight: .medium))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(.secondary)
+                }
             }
+            .padding(.bottom, 18)
             
-            // Section 2: Redesigned income and expense layout
-            HStack(spacing: 20) {
-                // Income section
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("本月收入")
+            // 核心数据 - 三列平均分布，去除彩色背景
+            HStack(spacing: 0) {
+                // 收入
+                VStack(spacing: 6) {
+                    Text("收入")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                     
                     RollingNumberView(
                         value: currentMonthIncome,
-                        font: .system(size: 20, weight: .bold, design: .rounded),
-                        textColor: .green,
-                        prefix: "¥"
+                        font: .system(size: 18, weight: .bold, design: .rounded),
+                        textColor: .primary,
+                        prefix: "¥",
+                        showDecimals: false
                     )
-                    
-                    // TODO: Add trend indicator
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.green)
-                        Text("+12.5%")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.green)
-                    }
                 }
+                .frame(maxWidth: .infinity)
                 
-                Spacer()
+                // 分隔线
+                Rectangle()
+                    .fill(Color(.systemGray5))
+                    .frame(width: 1, height: 35)
                 
-                // Expense section
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("本月支出")
+                // 支出
+                VStack(spacing: 6) {
+                    Text("支出")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                     
                     RollingNumberView(
                         value: currentMonthExpense,
-                        font: .system(size: 20, weight: .bold, design: .rounded),
-                        textColor: .red,
-                        prefix: "¥"
+                        font: .system(size: 18, weight: .bold, design: .rounded),
+                        textColor: .primary,
+                        prefix: "¥",
+                        showDecimals: false
                     )
-                    
-                    // TODO: Add trend indicator
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.down.right")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.red)
-                        Text("-5.8%")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.red)
-                    }
                 }
-            }
-            
-            // Section 3: Net balance and progress bar
-            VStack(spacing: 8) {
-                HStack {
-                    Text("净结余:")
-                        .font(.system(size: 14, weight: .medium))
+                .frame(maxWidth: .infinity)
+                
+                // 分隔线
+                Rectangle()
+                    .fill(Color(.systemGray5))
+                    .frame(width: 1, height: 35)
+                
+                // 余额
+                VStack(spacing: 6) {
+                    Text("余额")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                     
                     RollingNumberView(
                         value: balance,
-                        font: .system(size: 16, weight: .bold, design: .rounded),
-                        textColor: balance >= 0 ? .blue : .red,
-                        prefix: "¥"
+                        font: .system(size: 18, weight: .bold, design: .rounded),
+                        textColor: balance >= 0 ? .primary : Color(red: 0.8, green: 0.3, blue: 0.3),
+                        prefix: "¥",
+                        showDecimals: false
                     )
-                    
-                    let balancePercentage = currentMonthIncome > 0 ? (balance / currentMonthIncome) * 100 : 0
-                    Text("(\(String(format: "%.1f", balancePercentage))%)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
                 }
-                
-                // Improved progress bar
-                ImprovedProgressView(
-                    expense: currentMonthExpense,
-                    balance: balance,
-                    totalIncome: currentMonthIncome
-                )
+                .frame(maxWidth: .infinity)
             }
+            .padding(.bottom, 20)
             
-            // Section 4: SegmentedControl for month switching
+            // 进度条 - 保持红绿配色与SummaryCardsView呼应
+            RedGreenProgressView(
+                expense: currentMonthExpense,
+                balance: balance,
+                totalIncome: currentMonthIncome
+            )
+            .padding(.bottom, 18)
+            
+            // 月份切换器 - 简化设计
             MonthSwitcherView(selectedPeriod: $selectedPeriod)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color(.systemGray4), lineWidth: 1.5)
+                        .stroke(Color(.systemGray6), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
         )
         .padding(.horizontal)
         .sheet(isPresented: $showDailyExpenseDetails) {
@@ -1171,7 +1175,97 @@ struct IncomeDetailsView: View {
     }
 }
 
-// MARK: - Improved Progress View
+// MARK: - Red Green Progress View (与SummaryCardsView配色呼应)
+struct RedGreenProgressView: View {
+    let expense: Double
+    let balance: Double
+    let totalIncome: Double
+    
+    private var expenseRatio: Double {
+        guard totalIncome > 0 else { return 0 }
+        return min(expense / totalIncome, 1.0)
+    }
+    
+    private var balanceRatio: Double {
+        guard totalIncome > 0 else { return 0 }
+        return min(max((totalIncome - expense) / totalIncome, 0), 1.0)
+    }
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // 进度条 - 使用与SummaryCardsView相同的红绿配色
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // 背景条
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemGray6))
+                        .frame(height: 20)
+                    
+                    HStack(spacing: 0) {
+                        // 支出部分 - 使用红色，与"记支出"按钮呼应
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.red.opacity(0.6),
+                                        Color.red.opacity(0.4)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * expenseRatio, height: 20)
+                            .animation(.easeInOut(duration: 0.8), value: expenseRatio)
+                        
+                        // 余额部分 - 使用绿色，与"记收入"按钮呼应
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.green.opacity(0.4),
+                                        Color.green.opacity(0.6)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * balanceRatio, height: 20)
+                            .animation(.easeInOut(duration: 0.8), value: balanceRatio)
+                        
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(height: 20)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            // 标签和百分比
+            HStack {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.red.opacity(0.6))
+                        .frame(width: 8, height: 8)
+                    Text("支出 \(String(format: "%.1f", expenseRatio * 100))%")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green.opacity(0.6))
+                        .frame(width: 8, height: 8)
+                    Text("余额 \(String(format: "%.1f", balanceRatio * 100))%")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Improved Progress View (Legacy)
 struct ImprovedProgressView: View {
     let expense: Double
     let balance: Double
