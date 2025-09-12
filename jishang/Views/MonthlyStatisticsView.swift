@@ -494,6 +494,8 @@ struct ConsumptionTrendView: View {
                 }
             }
             
+            Spacer()
+            
             // 图表区域 - 缩小高度
             ScrollableBarChartView(store: store, selectedMonth: selectedMonth, selectedDate: $selectedDate)
                 .frame(height: 200)
