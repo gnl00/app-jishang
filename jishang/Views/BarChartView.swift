@@ -303,9 +303,11 @@ struct BarChartPageView: View {
                 HStack(spacing: barSpacing) {
                     ForEach(chartData, id: \.id) { datum in
                         let isToday = calendar.isDateInToday(datum.date)
+                        let isSelected = selectedDate != nil && calendar.isDate(datum.date, inSameDayAs: selectedDate!)
+                        
                         Text(formatDateLabel(datum.date))
-                            .font(.system(size: 10, weight: isToday ? .semibold : .regular))
-                            .foregroundColor(isToday ? .primary : .secondary)
+                            .font(.system(size: 10, weight: isSelected ? .bold : (isToday ? .semibold : .regular)))
+                            .foregroundColor(isSelected ? .primary : (isToday ? .primary : .secondary))
                             .frame(width: barWidth)
                     }
                 }
@@ -378,7 +380,14 @@ struct BarItemView: View {
         }
         .frame(width: barWidth, height: maxBarHeight, alignment: .bottom)
         .contentShape(Rectangle())
-        .onTapGesture { selectedDate = datum.date }
+        .onTapGesture { 
+            // Toggle功能：如果点击的是已选中的日期，则取消选中；否则选中新日期
+            if isSelected {
+                selectedDate = nil
+            } else {
+                selectedDate = datum.date
+            }
+        }
         .accessibilityLabel("\(formatDate(datum.date))")
         .accessibilityValue("支出: \(String(format: "%.2f", datum.expense)), 收入: \(String(format: "%.2f", datum.income))")
     }
