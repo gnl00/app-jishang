@@ -902,25 +902,39 @@ struct MonthPickerView: View {
                 Text("暂无数据")
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
             } else {
-                Picker("月份", selection: Binding(
-                    get: { normalizedSelectedMonth },
-                    set: { selectedMonth = $0 }
-                )) {
+                Menu {
                     ForEach(availableMonths, id: \.self) { month in
-                        Text(monthFormatter.string(from: month))
-                            .tag(month)
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedMonth = month
+                            }
+                        }) {
+                            HStack {
+                                Text(monthFormatter.string(from: month))
+                                if normalizedSelectedMonth == month {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
                     }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(monthFormatter.string(from: normalizedSelectedMonth))
+                            .font(.system(size: 14, weight: .medium))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
                 }
-                .pickerStyle(.menu)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 4)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
             }
         }
         .onAppear {
