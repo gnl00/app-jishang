@@ -91,31 +91,148 @@ struct SummaryCardsView: View {
     }
     
     var body: some View {
-        HStack(spacing: 8) {
-            ActionButtonView(
-                title: "记收入",
-                icon: "plus.circle.fill",
-                borderColor: .blue,
-                iconColor: .blue,
-                textColor: .primary,
-                action: onIncomeAction,
-                longPressAction: onVoiceIncomeAction
-            )
-            .transition(.slide)
-
-            ActionButtonView(
-                title: "记支出",
-                icon: "minus.circle.fill",
-                borderColor: .red,
-                iconColor: .red,
-                textColor: .primary,
-                action: onExpenseAction,
-                longPressAction: onVoiceExpenseAction
-            )
-            .transition(.slide)
+        VStack(spacing: 12) {
+            // Header
+            HStack {
+                Text("💰 快速记账")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            
+            // Action Cards
+            HStack(spacing: 12) {
+                // Income Card - 收入：箭头向下（钱流入账户）
+                ImprovedActionCard(
+                    title: "记收入",
+                    icon: "arrow.down.circle.fill",
+                    gradientColors: [
+                        Color.green.opacity(0.6),
+                        Color.green.opacity(0.4)
+                    ],
+                    primaryColor: .green,
+                    hasVoiceFeature: onVoiceIncomeAction != nil,
+                    action: onIncomeAction,
+                    longPressAction: onVoiceIncomeAction
+                )
+                
+                // Expense Card - 支出：箭头向上（钱花出去）
+                ImprovedActionCard(
+                    title: "记支出", 
+                    icon: "arrow.up.circle.fill",
+                    gradientColors: [
+                        Color.red.opacity(0.6),
+                        Color.red.opacity(0.4)
+                    ],
+                    primaryColor: .red,
+                    hasVoiceFeature: onVoiceExpenseAction != nil,
+                    action: onExpenseAction,
+                    longPressAction: onVoiceExpenseAction
+                )
+            }
         }
         .padding(.horizontal)
         .transition(.scale.combined(with: .opacity))
+    }
+}
+
+// MARK: - Improved Action Card
+struct ImprovedActionCard: View {
+    let title: String
+    let icon: String
+    let gradientColors: [Color]
+    let primaryColor: Color
+    let hasVoiceFeature: Bool
+    let action: () -> Void
+    let longPressAction: (() -> Void)?
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(
+                LinearGradient(
+                    colors: gradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                VStack(spacing: 12) {
+                    // Main Icon
+                    Image(systemName: icon)
+                        .font(.system(size: 28, weight: .semibold))
+                        .foregroundColor(.white)
+                        .changeEffect(.wiggle, value: isPressed)
+                        .changeEffect(.glow, value: isPressed)
+                    
+                    // Title
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    // Voice Feature Indicator
+                    if hasVoiceFeature {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mic.circle.fill")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                            Text("长按语音")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.white.opacity(0.2))
+                        )
+                    }
+                }
+                .padding()
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.3),
+                                Color.white.opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .frame(height: 120)
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .shadow(
+                color: primaryColor.opacity(0.3),
+                radius: isPressed ? 8 : 4,
+                x: 0,
+                y: isPressed ? 4 : 2
+            )
+            .animation(.easeInOut(duration: 0.15), value: isPressed)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                // Haptic feedback
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+                action()
+            }
+            .onLongPressGesture(minimumDuration: 0.5, maximumDistance: .infinity, perform: {
+                if hasVoiceFeature {
+                    // Stronger haptic feedback for long press
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                    impactFeedback.impactOccurred()
+                    longPressAction?()
+                }
+            }, onPressingChanged: { pressing in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isPressed = pressing
+                }
+            })
     }
 }
 
