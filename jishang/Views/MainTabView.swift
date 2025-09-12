@@ -23,7 +23,7 @@ enum TabSelection: Int, CaseIterable {
     var icon: String {
         switch self {
         case .home: return "house"
-        case .statistics: return "chart.bar"
+        case .statistics: return "chart.line.uptrend.xyaxis"
         case .settings: return "gearshape"
         }
     }
@@ -31,7 +31,7 @@ enum TabSelection: Int, CaseIterable {
     var selectedIcon: String {
         switch self {
         case .home: return "house.fill"
-        case .statistics: return "chart.bar.fill"
+        case .statistics: return "chart.line.uptrend.xyaxis"
         case .settings: return "gearshape.fill"
         }
     }

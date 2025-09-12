@@ -181,7 +181,7 @@ struct TransactionRowView: View {
                 // 左上角三角形背景色 (较淡)
                 VStack {
                     HStack {
-                        TriangleCornerTopLeft(color: cardBorderColor.opacity(0.3))
+                        TriangleCornerTopLeft(color: cardBorderColor.opacity(0.6))
                             .frame(width: 32, height: 32)
                         Spacer()
                     }
@@ -194,7 +194,7 @@ struct TransactionRowView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        TriangleCornerBottomRight(color: cardBorderColor)
+                        TriangleCornerBottomRight(color: cardBorderColor.opacity(0.3))
                             .frame(width: 32, height: 32)
                     }
                 }
