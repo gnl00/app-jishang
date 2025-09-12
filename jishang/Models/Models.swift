@@ -18,6 +18,26 @@ extension Double {
         let sign = self >= 0 ? "+" : "-"
         return String(format: "%@¥%.2f", sign, abs(self))
     }
+    
+    /// 格式化为整数货币 (例：¥1234)
+    var currencyFormattedInt: String {
+        return String(format: "¥%.0f", self)
+    }
+    
+    /// 格式化为一位小数货币 (例：¥123.4)
+    var currencyFormattedOneDecimal: String {
+        return String(format: "¥%.1f", self)
+    }
+    
+    /// 格式化为百分比，一位小数 (例：12.3%)
+    var percentFormattedOneDecimal: String {
+        return String(format: "%.1f%%", self)
+    }
+    
+    /// 格式化为百分比，整数 (例：12%)
+    var percentFormattedInt: String {
+        return String(format: "%.0f%%", self)
+    }
 }
 
 enum TransactionType: String, CaseIterable, Codable, Identifiable {
@@ -482,5 +502,55 @@ class TransactionStore: ObservableObject {
             }
             return first.month > second.month
         }
+    }
+    
+    // MARK: - Monthly Transaction Filtering (Optimized)
+    
+    /// 获取指定月份的交易记录，可选择性过滤交易类型
+    func monthlyTransactions(for month: Date, type: TransactionType? = nil) -> [Transaction] {
+        let calendar = Calendar.current
+        return transactions.filter { transaction in
+            let monthMatch = calendar.isDate(transaction.date, equalTo: month, toGranularity: .month)
+            if let type = type {
+                return monthMatch && transaction.type == type
+            }
+            return monthMatch
+        }
+    }
+    
+    /// 获取指定月份的支出交易记录
+    func monthlyExpenseTransactions(for month: Date) -> [Transaction] {
+        return monthlyTransactions(for: month, type: .expense)
+    }
+    
+    /// 获取指定月份的收入交易记录
+    func monthlyIncomeTransactions(for month: Date) -> [Transaction] {
+        return monthlyTransactions(for: month, type: .income)
+    }
+    
+    /// 获取指定月份的类别支出汇总
+    func monthlyCategoryTotals(for month: Date, type: TransactionType = .expense) -> [Category: Double] {
+        let monthTransactions = monthlyTransactions(for: month, type: type)
+        var categoryTotals: [Category: Double] = [:]
+        
+        for transaction in monthTransactions {
+            categoryTotals[transaction.category, default: 0] += transaction.amount
+        }
+        
+        return categoryTotals
+    }
+    
+    /// 获取指定月份每日的支出汇总
+    func dailyTotals(for month: Date, type: TransactionType = .expense) -> [Date: Double] {
+        let calendar = Calendar.current
+        let monthTransactions = monthlyTransactions(for: month, type: type)
+        var dailyTotals: [Date: Double] = [:]
+        
+        for transaction in monthTransactions {
+            let day = calendar.startOfDay(for: transaction.date)
+            dailyTotals[day, default: 0] += transaction.amount
+        }
+        
+        return dailyTotals
     }
 }
