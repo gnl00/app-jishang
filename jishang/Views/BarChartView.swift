@@ -21,11 +21,13 @@ struct ScrollableBarChartView: View {
     @ObservedObject var store: TransactionStore
     let selectedMonth: Date?
     @Binding var selectedDate: Date?
+    let viewMode: ChartViewMode
     
-    init(store: TransactionStore, selectedMonth: Date? = nil, selectedDate: Binding<Date?> = .constant(nil)) {
+    init(store: TransactionStore, selectedMonth: Date? = nil, selectedDate: Binding<Date?> = .constant(nil), viewMode: ChartViewMode = .week) {
         self.store = store
         self.selectedMonth = selectedMonth
         self._selectedDate = selectedDate
+        self.viewMode = viewMode
     }
     
     // UI-only state: current page (7-day window). Reset on month change via .id(monthDate)
@@ -44,15 +46,77 @@ struct ScrollableBarChartView: View {
     }
     
     private var chartData: [DayDatum] {
-        // 如果选择了特定月份，使用该月份的数据；否则使用默认逻辑
+        // 根据视图模式和选择的月份返回不同的数据
         if let selectedMonth = selectedMonth {
-            return monthlyChartData(for: selectedMonth)
+            switch viewMode {
+            case .week:
+                return weeklyChartData(for: selectedMonth)
+            case .month:
+                return monthlyChartData(for: selectedMonth)
+            }
         } else {
             return defaultChartData()
         }
     }
     
+    private func weeklyChartData(for month: Date) -> [DayDatum] {
+        // 周视图：7天分页，支持滑动查看更早数据（保持原有逻辑）
+        let calendar = Calendar.current
+        let startOfMonth = calendar.startOfMonth(for: month)
+        let today = calendar.startOfDay(for: Date())
+        let isCurrentMonth = calendar.isDate(month, equalTo: Date(), toGranularity: .month)
+        
+        // 计算结束日期：如果是当前月份，则到今天为止；否则到月末
+        let endDate: Date
+        if isCurrentMonth {
+            endDate = today
+        } else {
+            // 获取该月的最后一天
+            let range = calendar.range(of: .day, in: .month, for: month) ?? 1..<32
+            let lastDay = range.count
+            endDate = calendar.date(byAdding: .day, value: lastDay - 1, to: startOfMonth) ?? startOfMonth
+        }
+        
+        // 过滤该月份的交易
+        let monthTransactions = store.transactions.filter { transaction in
+            calendar.isDate(transaction.date, equalTo: month, toGranularity: .month)
+        }
+        
+        let expenseTx = monthTransactions.filter { $0.type == .expense }
+        let incomeTx = monthTransactions.filter { $0.type == .income }
+        
+        // 按天聚合
+        var expenseTotals: [Date: Double] = [:]
+        var incomeTotals: [Date: Double] = [:]
+        
+        for t in expenseTx {
+            let key = calendar.startOfDay(for: t.date)
+            expenseTotals[key, default: 0] += t.amount
+        }
+        for t in incomeTx {
+            let key = calendar.startOfDay(for: t.date)
+            incomeTotals[key, default: 0] += t.amount
+        }
+        
+        // 生成从月初到结束日期的每天数据
+        var data: [DayDatum] = []
+        var cursor = startOfMonth
+        var day = 1
+        
+        while cursor <= endDate {
+            let expense = expenseTotals[cursor] ?? 0
+            let income = incomeTotals[cursor] ?? 0
+            data.append(DayDatum(day: day, income: income, expense: expense, date: cursor))
+            
+            day += 1
+            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? endDate
+        }
+        
+        return data
+    }
+    
     private func monthlyChartData(for month: Date) -> [DayDatum] {
+        // 月视图：展示当月所有天数的数据，从月初到今天/月末，不分页
         let calendar = Calendar.current
         let startOfMonth = calendar.startOfMonth(for: month)
         let today = calendar.startOfDay(for: Date())
@@ -153,6 +217,12 @@ struct ScrollableBarChartView: View {
     private var pageCount: Int {
         guard !chartData.isEmpty else { return 1 }
         
+        // 月视图：显示所有数据，不分页
+        if viewMode == .month {
+            return 1
+        }
+        
+        // 周视图：7天分页逻辑
         let total = chartData.count
         
         // 如果总数据不足7天，只需要1页
@@ -168,6 +238,12 @@ struct ScrollableBarChartView: View {
     private func pageRange(_ page: Int) -> Range<Int> {
         let total = chartData.count
         
+        // 月视图：返回所有数据
+        if viewMode == .month {
+            return 0..<total
+        }
+        
+        // 周视图：7天分页逻辑
         // 如果总数据不足7天，直接返回全部数据
         if total <= daysPerPage {
             return 0..<total
@@ -240,7 +316,7 @@ struct ScrollableBarChartView: View {
 
             // 页脚：提示与页码（可选）
             HStack {
-                Text("向右滑动展示更早数据")
+                Text(viewMode == .week ? "向右滑动展示更早数据" : "展示当月所有数据")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
@@ -251,6 +327,10 @@ struct ScrollableBarChartView: View {
             currentPage = lastPageIndex
         }
         .onChange(of: store.transactions.count) { _, _ in
+            currentPage = lastPageIndex
+        }
+        .onChange(of: viewMode) { _, _ in
+            // 当视图模式改变时，重置到最新页
             currentPage = lastPageIndex
         }
     }
@@ -380,8 +460,7 @@ struct BarItemView: View {
         }
         .frame(width: barWidth, height: maxBarHeight, alignment: .bottom)
         .contentShape(Rectangle())
-        .onTapGesture { 
-            // Toggle功能：如果点击的是已选中的日期，则取消选中；否则选中新日期
+        .onTapGesture {
             if isSelected {
                 selectedDate = nil
             } else {

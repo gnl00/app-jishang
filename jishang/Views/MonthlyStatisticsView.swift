@@ -31,8 +31,7 @@ struct MonthlyStatisticsView: View {
     
     @State private var selectedMonth: Date
     @State private var selectedDate: Date?
-    // TODO：chartViewMode 目前只在UI中显示切换按钮，实际图表逻辑尚未完全实现周/月视图切换
-    @State private var chartViewMode: ChartViewMode = .month
+    @State private var chartViewMode: ChartViewMode = .week
     
     init(store: TransactionStore, monthDate: Date) {
         self.store = store
@@ -538,7 +537,7 @@ struct ConsumptionTrendView: View {
             Spacer()
             
             // 图表区域 - 缩小高度
-            ScrollableBarChartView(store: store, selectedMonth: selectedMonth, selectedDate: $selectedDate)
+            ScrollableBarChartView(store: store, selectedMonth: selectedMonth, selectedDate: $selectedDate, viewMode: viewMode)
                 .frame(height: 200)
             
             // 点击提示
