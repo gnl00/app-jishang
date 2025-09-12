@@ -125,6 +125,12 @@ enum FilterType: Equatable {
     case all
     case byTransactionType(TransactionType)
     case byCategory(Category)
+    case byYear(Int)
+    case byMonth(Int, Int) // year, month
+    case byYearAndTransactionType(Int, TransactionType)
+    case byMonthAndTransactionType(Int, Int, TransactionType) // year, month, type
+    case byYearAndCategory(Int, Category)
+    case byMonthAndCategory(Int, Int, Category) // year, month, category
     
     var displayName: String {
         switch self {
@@ -134,6 +140,18 @@ enum FilterType: Equatable {
             return type == .income ? "收入" : "支出"
         case .byCategory(let category):
             return category.rawValue
+        case .byYear(let year):
+            return "\(String(format: "%d", year))年"
+        case .byMonth(let year, let month):
+            return "\(String(format: "%d", year))年\(month)月"
+        case .byYearAndTransactionType(let year, let type):
+            return "\(String(format: "%d", year))年 - \(type == .income ? "收入" : "支出")"
+        case .byMonthAndTransactionType(let year, let month, let type):
+            return "\(String(format: "%d", year))年\(month)月 - \(type == .income ? "收入" : "支出")"
+        case .byYearAndCategory(let year, let category):
+            return "\(String(format: "%d", year))年 - \(category.rawValue)"
+        case .byMonthAndCategory(let year, let month, let category):
+            return "\(String(format: "%d", year))年\(month)月 - \(category.rawValue)"
         }
     }
     
@@ -154,6 +172,10 @@ enum FilterType: Equatable {
     }
     
     func matches(transaction: Transaction) -> Bool {
+        let calendar = Calendar.current
+        let transactionYear = calendar.component(.year, from: transaction.date)
+        let transactionMonth = calendar.component(.month, from: transaction.date)
+        
         switch self {
         case .all:
             return true
@@ -161,6 +183,18 @@ enum FilterType: Equatable {
             return transaction.type == type
         case .byCategory(let category):
             return transaction.category == category
+        case .byYear(let year):
+            return transactionYear == year
+        case .byMonth(let year, let month):
+            return transactionYear == year && transactionMonth == month
+        case .byYearAndTransactionType(let year, let type):
+            return transactionYear == year && transaction.type == type
+        case .byMonthAndTransactionType(let year, let month, let type):
+            return transactionYear == year && transactionMonth == month && transaction.type == type
+        case .byYearAndCategory(let year, let category):
+            return transactionYear == year && transaction.category == category
+        case .byMonthAndCategory(let year, let month, let category):
+            return transactionYear == year && transactionMonth == month && transaction.category == category
         }
     }
 }
@@ -404,5 +438,49 @@ class TransactionStore: ObservableObject {
         return transactions.filter { transaction in
             calendar.isDate(transaction.date, equalTo: date, toGranularity: .month) && transaction.type == .expense
         }.reduce(0) { $0 + $1.amount }
+    }
+    
+    // MARK: - Date-based filtering helpers
+    
+    /// 获取所有交易中包含的年份，按降序排列
+    var availableYears: [Int] {
+        let calendar = Calendar.current
+        let years = Set(transactions.map { calendar.component(.year, from: $0.date) })
+        return Array(years).sorted(by: >)
+    }
+    
+    /// 获取指定年份中包含的月份，按升序排列
+    func availableMonths(for year: Int) -> [Int] {
+        let calendar = Calendar.current
+        let months = Set(transactions.compactMap { transaction in
+            let transactionYear = calendar.component(.year, from: transaction.date)
+            if transactionYear == year {
+                return calendar.component(.month, from: transaction.date)
+            }
+            return nil
+        })
+        return Array(months).sorted()
+    }
+    
+    /// 获取所有交易中包含的年月组合，按降序排列
+    var availableYearMonths: [(year: Int, month: Int)] {
+        let calendar = Calendar.current
+        
+        // 使用字典来去重，key 是 "year-month" 的字符串格式
+        var yearMonthDict: [String: (year: Int, month: Int)] = [:]
+        
+        for transaction in transactions {
+            let year = calendar.component(.year, from: transaction.date)
+            let month = calendar.component(.month, from: transaction.date)
+            let key = "\(year)-\(month)"
+            yearMonthDict[key] = (year: year, month: month)
+        }
+        
+        return Array(yearMonthDict.values).sorted { first, second in
+            if first.year != second.year {
+                return first.year > second.year
+            }
+            return first.month > second.month
+        }
     }
 }
