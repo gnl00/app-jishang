@@ -41,7 +41,7 @@ struct TransactionListView: View {
     @ViewBuilder
     private func transactionRow(for transaction: Transaction) -> some View {
         TransactionRowView(transaction: transaction)
-            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            .listRowInsets(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
             .transition(.asymmetric(
@@ -51,34 +51,29 @@ struct TransactionListView: View {
             .opacity(deletingTransactionId == transaction.id ? 0.3 : 1.0)
             .scaleEffect(deletingTransactionId == transaction.id ? 0.8 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: deletingTransactionId)
-            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                deleteButton(for: transaction)
-            }
-            .swipeActions(edge: .leading) {
-                editButton(for: transaction)
+            .contextMenu {
+                Button("编辑", systemImage: "pencil") {
+                    // 轻触觉反馈
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
+                    editingTransaction = transaction
+                }
+
+                Button("删除", systemImage: "trash", role: .destructive) {
+                    // 重触觉反馈
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        deletingTransactionId = transaction.id
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        store.deleteTransaction(transaction)
+                        deletingTransactionId = nil
+                    }
+                }
             }
     }
     
-    @ViewBuilder
-    private func deleteButton(for transaction: Transaction) -> some View {
-        Button("删除", role: .destructive) {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                deletingTransactionId = transaction.id
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                store.deleteTransaction(transaction)
-                deletingTransactionId = nil
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func editButton(for transaction: Transaction) -> some View {
-        Button("编辑") {
-            editingTransaction = transaction
-        }
-        .tint(.blue)
-    }
 }
 
 struct TransactionRowView: View {
@@ -122,7 +117,7 @@ struct TransactionRowView: View {
                 ZStack {
                     Circle()
                         .fill(cardBorderColor.opacity(0.3))
-                        .frame(width: 44, height: 44)
+                        .frame(width: 38, height: 38)
                     
                     Text(transaction.category.icon)
                         .font(.system(size: 20))
