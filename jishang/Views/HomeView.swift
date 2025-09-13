@@ -67,16 +67,63 @@ struct HomeView: View {
                             }
                             .padding(.horizontal, 8)
                         } header: {
-                            CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
-                                .padding(.vertical, 4)
-                                .background(
-                                    // Solid background when pinned
-                                    Color(.systemGroupedBackground)
-                                        .ignoresSafeArea()
-                                )
-                                .overlay(alignment: .bottom) {
-                                    Divider().opacity(0.6)
+                            VStack(spacing: 0) {
+                                
+                                // 占位元素
+                                // TODO：在 MonthlySummaryView 被折叠之前不显示
+                                HStack {
+                                    Spacer()
                                 }
+                                .padding(.vertical, 2)
+                                .background(Color(.systemGray6))
+                                
+                                // 月度总览展开按钮
+                                // TODO：在 MonthlySummaryView 被折叠之前不显示
+                                Button(action: {
+                                    // Haptic
+                                    let impact = UIImpactFeedbackGenerator(style: .light)
+                                    impact.impactOccurred()
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "chart.bar.fill").font(.system(size: 12, weight: .semibold))
+                                            .padding(.leading)
+                                        Text("月度总览")
+                                            .font(.system(size: 13, weight: .medium))
+                                        Spacer()
+                                        Text("（点击展开）")
+                                            .font(.system(size: 13, weight: .medium))
+                                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                                            .padding(.trailing)
+                                    }
+                                    .foregroundColor(.secondary)
+                                    // .padding(.horizontal, 12)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color(.systemBackground))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color(.systemGray6), lineWidth: 1)
+                                            )
+                                    )
+                                    .padding(.horizontal, 4)
+                                }
+                                //.background(Color.red)
+                                //.padding(.top, 2)
+                                .buttonStyle(.plain)
+                                .contentShape(Rectangle())
+                                
+                                CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
+                                    .padding(.bottom, 4)
+                                    .background(
+                                        // Solid background when pinned
+                                        Color(.systemGroupedBackground)
+                                            .ignoresSafeArea()
+                                    )
+                                    .overlay(alignment: .bottom) {
+                                        Divider().opacity(0.6)
+                                    }
+                            }
                         }
                     }
                 }
