@@ -54,19 +54,18 @@ struct HomeView: View {
                     LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
                         // Collapsible Monthly Summary
                         monthlySummaryCollapsible
-                            .padding(.horizontal)
                             .padding(.top, 8)
                         
                         // Sticky Category Filter + Transaction rows
                         Section {
-                            LazyVStack(spacing: 8) {
+                            LazyVStack(spacing: 4) {
                                 ForEach(filteredTransactions) { transaction in
                                     transactionRow(for: transaction)
-                                        .padding(.horizontal)
                                 }
                                 .animation(.default, value: filteredTransactions.count)
                                 .padding(.bottom, 20)
                             }
+                            .padding(.horizontal, 8)
                         } header: {
                             CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
                                 .padding(.vertical, 4)
