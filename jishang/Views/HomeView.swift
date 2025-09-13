@@ -17,6 +17,7 @@ struct HomeView: View {
     // Collapsing MonthlySummary
     @State private var summaryHeight: CGFloat = 0
     @State private var summaryMinY: CGFloat = 0
+    @State private var collapseProgress: Double = 0.0
     
     // Inline list edit/delete support
     @State private var editingTransaction: Transaction?
@@ -48,6 +49,7 @@ struct HomeView: View {
                     )
                 }
                 .padding(.top)
+                .padding(.bottom, 6)
                 
                 // Scrollable content: MonthlySummary (collapsible) + CategoryFilter (sticky) + Transactions
                 ScrollView {
@@ -63,56 +65,25 @@ struct HomeView: View {
                                     transactionRow(for: transaction)
                                 }
                                 .animation(.default, value: filteredTransactions.count)
-                                .padding(.bottom, 20)
+                                .padding(.bottom, 1)
                             }
                             .padding(.horizontal, 8)
                         } header: {
                             VStack(spacing: 0) {
-                                
-                                // 占位元素
-                                // TODO：在 MonthlySummaryView 被折叠之前不显示
-                                HStack {
-                                    Spacer()
-                                }
-                                .padding(.vertical, 2)
-                                .background(Color(.systemGray6))
-                                
-                                // 月度总览展开按钮
-                                // TODO：在 MonthlySummaryView 被折叠之前不显示
-                                Button(action: {
-                                    // Haptic
-                                    let impact = UIImpactFeedbackGenerator(style: .light)
-                                    impact.impactOccurred()
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "chart.bar.fill").font(.system(size: 12, weight: .semibold))
-                                            .padding(.leading)
-                                        Text("月度总览")
-                                            .font(.system(size: 13, weight: .medium))
-                                        Spacer()
-                                        Text("（点击展开）")
-                                            .font(.system(size: 13, weight: .medium))
-                                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
-                                            .padding(.trailing)
+                                let _  = print("collapseProgress: \(collapseProgress)")
+
+                                // 折叠后的月度总览组件 - 包含占位元素和展开按钮
+                                if collapseProgress > 0.6 {
+                                    CollapsedSummaryView {
+                                        // TODO: 添加展开MonthlySummaryView的逻辑
                                     }
-                                    .foregroundColor(.secondary)
-                                    // .padding(.horizontal, 12)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color(.systemBackground))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(Color(.systemGray6), lineWidth: 1)
-                                            )
-                                    )
-                                    .padding(.horizontal, 4)
+                                    .transition(.asymmetric(
+                                        insertion: .movingParts.boing,
+                                        removal: .opacity.combined(with: .scale(scale: 0.8))
+                                    ))
+                                    .zIndex(1) // 确保正确的层级
                                 }
-                                //.background(Color.red)
-                                //.padding(.top, 2)
-                                .buttonStyle(.plain)
-                                .contentShape(Rectangle())
-                                
+
                                 CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
                                     .padding(.bottom, 4)
                                     .background(
@@ -124,6 +95,7 @@ struct HomeView: View {
                                         Divider().opacity(0.6)
                                     }
                             }
+                            .animation(.spring(response: 0.6, dampingFraction: 0.6), value: collapseProgress > 0.6)
                         }
                     }
                 }
@@ -221,8 +193,19 @@ extension HomeView {
             // Track vertical offset in scroll space BEFORE frame applied
             .background(
                 GeometryReader { proxy in
-                    Color.clear
-                        .preference(key: SummaryMinYPreferenceKey.self, value: proxy.frame(in: .named("homeScroll")).minY)
+                    let minY = proxy.frame(in: .named("homeScroll")).minY
+                    let _ = print("GeometryReader minY: \(minY)")
+
+                    // 直接更新状态，避免PreferenceKey问题
+                    DispatchQueue.main.async {
+                        if self.summaryMinY != minY {
+                            self.summaryMinY = minY
+                            self.updateCollapseProgress()
+                        }
+                    }
+
+                    return Color.clear
+                        .preference(key: SummaryMinYPreferenceKey.self, value: minY)
                 }
             )
             // Visual refinement when collapsing
@@ -230,8 +213,23 @@ extension HomeView {
             .scaleEffect(x: 1.0, y: max(0.85, 1.0 - progress * 0.1), anchor: .top)
             .frame(height: summaryHeight == 0 ? nil : effectiveHeight)
             .clipped(antialiased: true)
-            .onPreferenceChange(SummaryHeightPreferenceKey.self) { self.summaryHeight = $0 }
-            .onPreferenceChange(SummaryMinYPreferenceKey.self) { self.summaryMinY = $0 }
+            .onPreferenceChange(SummaryHeightPreferenceKey.self) {
+                self.summaryHeight = $0
+                // 当高度变化时也更新进度
+                self.updateCollapseProgress()
+            }
+            .onPreferenceChange(SummaryMinYPreferenceKey.self) {
+                self.summaryMinY = $0
+                // 当位置变化时更新进度
+                self.updateCollapseProgress()
+            }
+    }
+
+    private func updateCollapseProgress() {
+        let effectiveHeight = max(0, summaryHeight - max(0, -summaryMinY))
+        let newProgress = summaryHeight > 0 ? 1 - (effectiveHeight / summaryHeight) : 0
+        print("updateCollapseProgress - summaryHeight: \(summaryHeight), summaryMinY: \(summaryMinY), effectiveHeight: \(effectiveHeight), newProgress: \(newProgress)")
+        collapseProgress = newProgress
     }
 }
 
@@ -284,6 +282,67 @@ extension HomeView {
                     }
                 }
             }
+    }
+}
+
+// MARK: - Collapsed Summary View
+struct CollapsedSummaryView: View {
+    let onExpandAction: () -> Void
+
+    init(onExpandAction: @escaping () -> Void) {
+        self.onExpandAction = onExpandAction
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 占位元素 - 灰色分隔条
+            HStack {
+                Spacer()
+            }
+            .padding(.vertical, 2)
+            .background(Color(.systemGray6))
+
+            // 月度总览展开按钮
+            Button(action: {
+                // Haptic反馈
+                let impact = UIImpactFeedbackGenerator(style: .light)
+                impact.impactOccurred()
+
+                // 执行展开动作
+                onExpandAction()
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.leading)
+
+                    Text("月度总览")
+                        .font(.system(size: 13, weight: .medium))
+
+                    Spacer()
+
+                    Text("（点击展开）")
+                        .font(.system(size: 13, weight: .medium))
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.trailing)
+                }
+                .foregroundColor(.secondary)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemBackground))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(.systemGray6), lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 4)
+            }
+            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+        }
     }
 }
 
