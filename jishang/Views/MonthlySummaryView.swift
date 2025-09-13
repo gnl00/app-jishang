@@ -139,7 +139,8 @@ struct MonthlySummaryView: View {
             // 月份切换器 - 简化设计
             MonthSwitcherView(selectedPeriod: $selectedPeriod)
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemBackground))
