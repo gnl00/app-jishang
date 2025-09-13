@@ -75,23 +75,33 @@ struct ActionButtonView: View {
 }
 
 struct SummaryCardsView: View {
+    @ObservedObject var store: TransactionStore
     let onExpenseAction: () -> Void
     let onIncomeAction: () -> Void
     let onVoiceExpenseAction: (() -> Void)?
     let onVoiceIncomeAction: (() -> Void)?
-    
-    @State private var todayTransactionCount: Int = 3 // TODO: 从实际数据获取
-    
-    init(onExpenseAction: @escaping () -> Void,
+
+    init(store: TransactionStore,
+         onExpenseAction: @escaping () -> Void,
          onIncomeAction: @escaping () -> Void,
          onVoiceExpenseAction: (() -> Void)? = nil,
          onVoiceIncomeAction: (() -> Void)? = nil) {
+        self.store = store
         self.onExpenseAction = onExpenseAction
         self.onIncomeAction = onIncomeAction
         self.onVoiceExpenseAction = onVoiceExpenseAction
         self.onVoiceIncomeAction = onVoiceIncomeAction
     }
-    
+
+    // 计算今日交易数量
+    private var todayTransactionCount: Int {
+        let calendar = Calendar.current
+        let today = Date()
+        return store.transactions.filter { transaction in
+            calendar.isDate(transaction.date, inSameDayAs: today)
+        }.count
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             // Header with stats
@@ -246,6 +256,7 @@ struct ImprovedActionCard: View {
 
 #Preview {
     SummaryCardsView(
+        store: TransactionStore(),
         onExpenseAction: { print("Add expense") },
         onIncomeAction: { print("Add income") },
         onVoiceExpenseAction: { print("Voice expense") },

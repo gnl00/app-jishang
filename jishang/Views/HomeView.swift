@@ -20,6 +20,7 @@ struct HomeView: View {
                 // Top action buttons (add expense/income)
                 VStack(spacing: 16) {
                     SummaryCardsView(
+                        store: transactionStore,
                         onExpenseAction: {
                             presentedTransactionType = .expense
                         },
