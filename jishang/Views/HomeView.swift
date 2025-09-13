@@ -79,7 +79,7 @@ struct HomeView: View {
                                     }
                                     .transition(.asymmetric(
                                         insertion: .movingParts.boing,
-                                        removal: .opacity.combined(with: .scale(scale: 0.8))
+                                        removal: .move(edge: .top).combined(with: .opacity)
                                     ))
                                     .zIndex(1) // 确保正确的层级
                                 }
@@ -95,7 +95,7 @@ struct HomeView: View {
                                         Divider().opacity(0.6)
                                     }
                             }
-                            .animation(.spring(response: 0.6, dampingFraction: 0.6), value: collapseProgress > 0.6)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: collapseProgress > 0.6)
                         }
                     }
                 }
