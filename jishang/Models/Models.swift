@@ -147,10 +147,13 @@ enum FilterType: Equatable {
     case byCategory(Category)
     case byYear(Int)
     case byMonth(Int, Int) // year, month
+    case byDay(Int, Int, Int) // year, month, day
     case byYearAndTransactionType(Int, TransactionType)
     case byMonthAndTransactionType(Int, Int, TransactionType) // year, month, type
+    case byDayAndTransactionType(Int, Int, Int, TransactionType) // year, month, day, type
     case byYearAndCategory(Int, Category)
     case byMonthAndCategory(Int, Int, Category) // year, month, category
+    case byDayAndCategory(Int, Int, Int, Category) // year, month, day, category
     
     var displayName: String {
         switch self {
@@ -164,14 +167,20 @@ enum FilterType: Equatable {
             return "\(String(format: "%d", year))年"
         case .byMonth(let year, let month):
             return "\(String(format: "%d", year))年\(month)月"
+        case .byDay(let year, let month, let day):
+            return "\(String(format: "%d", year))年\(month)月\(day)日"
         case .byYearAndTransactionType(let year, let type):
             return "\(String(format: "%d", year))年 - \(type == .income ? "收入" : "支出")"
         case .byMonthAndTransactionType(let year, let month, let type):
             return "\(String(format: "%d", year))年\(month)月 - \(type == .income ? "收入" : "支出")"
+        case .byDayAndTransactionType(let year, let month, let day, let type):
+            return "\(String(format: "%d", year))年\(month)月\(day)日 - \(type == .income ? "收入" : "支出")"
         case .byYearAndCategory(let year, let category):
             return "\(String(format: "%d", year))年 - \(category.rawValue)"
         case .byMonthAndCategory(let year, let month, let category):
             return "\(String(format: "%d", year))年\(month)月 - \(category.rawValue)"
+        case .byDayAndCategory(let year, let month, let day, let category):
+            return "\(String(format: "%d", year))年\(month)月\(day)日 - \(category.rawValue)"
         }
     }
     
@@ -195,7 +204,8 @@ enum FilterType: Equatable {
         let calendar = Calendar.current
         let transactionYear = calendar.component(.year, from: transaction.date)
         let transactionMonth = calendar.component(.month, from: transaction.date)
-        
+        let transactionDay = calendar.component(.day, from: transaction.date)
+
         switch self {
         case .all:
             return true
@@ -207,14 +217,20 @@ enum FilterType: Equatable {
             return transactionYear == year
         case .byMonth(let year, let month):
             return transactionYear == year && transactionMonth == month
+        case .byDay(let year, let month, let day):
+            return transactionYear == year && transactionMonth == month && transactionDay == day
         case .byYearAndTransactionType(let year, let type):
             return transactionYear == year && transaction.type == type
         case .byMonthAndTransactionType(let year, let month, let type):
             return transactionYear == year && transactionMonth == month && transaction.type == type
+        case .byDayAndTransactionType(let year, let month, let day, let type):
+            return transactionYear == year && transactionMonth == month && transactionDay == day && transaction.type == type
         case .byYearAndCategory(let year, let category):
             return transactionYear == year && transaction.category == category
         case .byMonthAndCategory(let year, let month, let category):
             return transactionYear == year && transactionMonth == month && transaction.category == category
+        case .byDayAndCategory(let year, let month, let day, let category):
+            return transactionYear == year && transactionMonth == month && transactionDay == day && transaction.category == category
         }
     }
 }
@@ -480,6 +496,20 @@ class TransactionStore: ObservableObject {
             return nil
         })
         return Array(months).sorted()
+    }
+
+    /// 获取指定年月中包含记账数据的日期，按升序排列
+    func availableDays(for year: Int, month: Int) -> [Int] {
+        let calendar = Calendar.current
+        let days = Set(transactions.compactMap { transaction in
+            let transactionYear = calendar.component(.year, from: transaction.date)
+            let transactionMonth = calendar.component(.month, from: transaction.date)
+            if transactionYear == year && transactionMonth == month {
+                return calendar.component(.day, from: transaction.date)
+            }
+            return nil
+        })
+        return Array(days).sorted()
     }
     
     /// 获取所有交易中包含的年月组合，按降序排列

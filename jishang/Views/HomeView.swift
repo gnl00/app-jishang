@@ -196,11 +196,11 @@ extension HomeView {
                     let minY = proxy.frame(in: .named("homeScroll")).minY
                     let _ = print("GeometryReader minY: \(minY)")
 
-                    // 直接更新状态，避免PreferenceKey问题
-                    DispatchQueue.main.async {
-                        if self.summaryMinY != minY {
-                            self.summaryMinY = minY
-                            self.updateCollapseProgress()
+                    // 使用Task来安全地更新状态
+                    Task { @MainActor in
+                        if summaryMinY != minY {
+                            summaryMinY = minY
+                            updateCollapseProgress()
                         }
                     }
 
