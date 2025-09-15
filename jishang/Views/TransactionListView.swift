@@ -10,24 +10,138 @@ import Pow
 
 struct TransactionListView: View {
     @ObservedObject var store: TransactionStore
-    let selectedFilter: FilterType
-    
+    @Binding var selectedFilter: FilterType
+
     @State private var editingTransaction: Transaction?
     @State private var showEditView = false
     @State private var deletingTransactionId: UUID?
+    // Internal collapse state
+    @State private var isCollapsed: Bool = false
+    @State private var lastLoggedBucket: Int = Int.min
+
+    // CategoryFilterView sticky state tracking
+    @State private var categoryFilterSticky: Bool = false
     
+
     private var filteredTransactions: [Transaction] {
         return store.transactions
             .filter { selectedFilter.matches(transaction: $0) }
             .sorted { $0.date > $1.date }
     }
-    
+
     var body: some View {
-        List(filteredTransactions) { transaction in
-            transactionRow(for: transaction)
+        let _ = print("[DEBUG] TransactionListView body render - isCollapsed: \(isCollapsed)")
+        ScrollViewReader { _ in
+            ScrollView {
+                LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                    // Top offset reporter for continuous scroll logging (debug)
+                    Color.clear
+                        .frame(height: 0)
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: ScrollOffsetKey.self,
+                                    value: proxy.frame(in: .named("txScroll")).minY
+                                )
+                            }
+                        )
+                    // Expanded: show monthly summary at top
+                    if !isCollapsed {
+                        MonthlySummaryView(store: store)
+                            .padding(.top, 8)
+                            .applyScrollFadeScale()
+                            .transition(
+                                .asymmetric(
+                                    insertion: .scale.combined(with: .opacity),
+                                    removal: .scale(scale: 0.95).combined(with: .opacity)
+                                )
+                            )
+                            .onAppear {
+                                print("[DEBUG] MonthlySummaryView appeared - isCollapsed: \(isCollapsed)")
+                            }
+                    }
+
+                    // CategoryFilter 哨兵 - 用于检测 CategoryFilterView 的位置
+                    Color.clear
+                        .frame(height: 1)
+                        .background(
+                            GeometryReader { proxy in
+                                let frame = proxy.frame(in: .named("txScroll"))
+                                let isSticky = frame.minY <= 0
+                                Color.clear
+                                    .preference(
+                                        key: CategoryFilterStickyPreferenceKey.self,
+                                        value: ["categoryFilter": isSticky]
+                                    )
+                                    .onChange(of: frame.minY) { minY in
+                                        print("[SENTINEL-DEBUG] Sentinel minY: \(String(format: "%.2f", minY)), isSticky: \(minY <= 0)")
+                                    }
+                            }
+                        )
+
+                    Section {
+                        // Transactions
+                        LazyVStack(spacing: 4) {
+                            ForEach(filteredTransactions) { transaction in
+                                transactionRow(for: transaction)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 1)
+                    } header: {
+                        VStack(spacing: 0) {
+                            if isCollapsed {
+                                CollapsedSummaryView {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        isCollapsed = false
+                                    }
+                                }
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                                .onAppear {
+                                    print("[DEBUG] CollapsedSummaryView appeared - isCollapsed: \(isCollapsed)")
+                                }
+                            }
+
+                            CategoryFilterView(
+                                store: store,
+                                selectedFilter: $selectedFilter
+                            )
+                            .padding(.bottom, 4)
+                        }
+                        .background(
+                            Color(.systemGroupedBackground)
+                                .ignoresSafeArea()
+                        )
+                        .overlay(alignment: .bottom) {
+                            Divider().opacity(0.6)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+            }
+            .coordinateSpace(name: "txScroll")
+            .background(Color(.systemGroupedBackground))
+            .onPreferenceChange(CategoryFilterStickyPreferenceKey.self) { preferences in
+                let _ = print("onPreferenceChange on pin state change")
+                if let isSticky = preferences["categoryFilter"] {
+                    if categoryFilterSticky != isSticky {
+                        categoryFilterSticky = isSticky
+                        print("[STICKY-DEBUG] CategoryFilterView pinned state changed: \(isSticky ? "PINNED" : "UNPINNED")")
+
+                        // 这里可以添加对 pinned 状态变化的响应逻辑
+                        onCategoryFilterViewSticky(isSticky)
+                    }
+                }
+            }
+            .onPreferenceChange(ScrollOffsetKey.self) { offset in
+                // 简化的滚动偏移日志记录
+                let bucket = Int((offset / 20).rounded())
+                if bucket != lastLoggedBucket {
+                    lastLoggedBucket = bucket
+                    print("[SCROLL-DEBUG] scrollOffset:\(String(format: "%.1f", offset)) isCollapsed:\(isCollapsed)")
+                }
+            }
         }
-        .listStyle(.plain)
-        .scrollIndicators(.hidden)
         .sheet(item: $editingTransaction) { transaction in
             AddTransactionView(
                 store: store,
@@ -73,7 +187,26 @@ struct TransactionListView: View {
                 }
             }
     }
-    
+
+    // MARK: - CategoryFilterView Sticky Handler
+    private func onCategoryFilterViewSticky(_ isSticky: Bool) {
+        print("[STICKY-DEBUG] onCategoryFilterViewSticky called with isSticky: \(isSticky)")
+
+        // 在这里可以根据 CategoryFilterView 的 pinned 状态来控制 MonthlySummaryView 的显示/隐藏
+        // 例如：当 CategoryFilterView 被 pinned 时，折叠 MonthlySummaryView
+        if isSticky && !isCollapsed {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                isCollapsed = true
+            }
+            print("[STICKY-DEBUG] CategoryFilterView pinned -> Collapsing MonthlySummaryView")
+        } else if !isSticky && isCollapsed {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                isCollapsed = false
+            }
+            print("[STICKY-DEBUG] CategoryFilterView unpinned -> Expanding MonthlySummaryView")
+        }
+    }
+
 }
 
 struct TransactionRowView: View {
@@ -252,7 +385,56 @@ struct TriangleCornerBottomRight: View {
     }
 }
 
+// MARK: - Utilities
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = .zero
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+// MARK: - 自定义 PreferenceKey 用于传输 CategoryFilterView 的 Sticky 状态
+private struct CategoryFilterStickyPreferenceKey: PreferenceKey {
+    typealias Value = [String: Bool]
+
+    static var defaultValue: Value = [:]
+
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+        value.merge(nextValue()) { _, new in new }
+    }
+}
+
+#if canImport(SwiftUI)
+private extension View {
+    @ViewBuilder
+    func applyScrollContentBackgroundHidden() -> some View {
+        if #available(iOS 16.0, *) {
+            self.scrollContentBackground(.hidden)
+        } else {
+            self
+        }
+    }
+
+    // iOS 17+ smooth scroll-based fade+scale for appearing/disappearing content
+    @ViewBuilder
+    func applyScrollFadeScale() -> some View {
+        if #available(iOS 17.0, *) {
+            self.scrollTransition { content, phase in
+                content
+                    .scaleEffect(phase.isIdentity ? 1.0 : 0.98)
+                    .opacity(phase.isIdentity ? 1.0 : 0.0)
+            }
+        } else {
+            self
+        }
+    }
+}
+#endif
+
 #Preview {
     let store = TransactionStore()
-    return TransactionListView(store: store, selectedFilter: .all)
+    return TransactionListView(
+        store: store,
+        selectedFilter: .constant(.all)
+    )
 }
