@@ -21,19 +21,16 @@ struct TransactionListView: View {
 
     // CategoryFilterView sticky state tracking
     @State private var categoryFilterSticky: Bool = false
+    @State private var isFilterChanging: Bool = false
     
 
-    private var filteredTransactions: [Transaction] {
-        return store.transactions
-            .filter { selectedFilter.matches(transaction: $0) }
-            .sorted { $0.date > $1.date }
-    }
+    // 移除 filteredTransactions 计算属性，过滤逻辑下沉到子组件
 
     var body: some View {
         let _ = print("[DEBUG] TransactionListView body render - isCollapsed: \(isCollapsed)")
-        ScrollViewReader { _ in
+        ScrollViewReader { scrollProxy in
             ScrollView {
-                LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                LazyVStack(spacing: 4, pinnedViews: [.sectionHeaders]) {
                     // Top offset reporter for continuous scroll logging (debug)
                     Color.clear
                         .frame(height: 0)
@@ -48,7 +45,8 @@ struct TransactionListView: View {
                     // Expanded: show monthly summary at top
                     if !isCollapsed {
                         MonthlySummaryView(store: store)
-                            .padding(.top, 8)
+                            .id("monthlySummary")
+                            .padding(.top, 4)
                             .applyScrollFadeScale()
                             .transition(
                                 .asymmetric(
@@ -64,6 +62,7 @@ struct TransactionListView: View {
                     // CategoryFilter 哨兵 - 用于检测 CategoryFilterView 的位置
                     Color.clear
                         .frame(height: 1)
+                        .id("categoryFilterSentinel")
                         .background(
                             GeometryReader { proxy in
                                 let frame = proxy.frame(in: .named("txScroll"))
@@ -74,20 +73,34 @@ struct TransactionListView: View {
                                         value: ["categoryFilter": isSticky]
                                     )
                                     .onChange(of: frame.minY) { minY in
-                                        print("[SENTINEL-DEBUG] Sentinel minY: \(String(format: "%.2f", minY)), isSticky: \(minY <= 0)")
+                                        // 添加防抖和过滤机制，减少不必要的更新
+                                        let currentIsSticky = minY <= 0
+                                        if !isFilterChanging {
+                                            print("[SENTINEL-DEBUG] Sentinel minY: \(String(format: "%.2f", minY)), isSticky: \(currentIsSticky)")
+                                        }
                                     }
                             }
                         )
 
                     Section {
-                        // Transactions
-                        LazyVStack(spacing: 4) {
-                            ForEach(filteredTransactions) { transaction in
-                                transactionRow(for: transaction)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 1)
+                        // Transactions - 使用独立组件处理过滤和渲染
+                        FilteredTransactionsList(
+                            transactions: store.transactions,
+                            selectedFilter: selectedFilter,
+                            onEditTransaction: { transaction in
+                                editingTransaction = transaction
+                            },
+                            onDeleteTransaction: { transaction in
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    deletingTransactionId = transaction.id
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    store.deleteTransaction(transaction)
+                                    deletingTransactionId = nil
+                                }
+                            },
+                            deletingTransactionId: deletingTransactionId
+                        )
                     } header: {
                         VStack(spacing: 0) {
                             if isCollapsed {
@@ -122,6 +135,12 @@ struct TransactionListView: View {
             .coordinateSpace(name: "txScroll")
             .background(Color(.systemGroupedBackground))
             .onPreferenceChange(CategoryFilterStickyPreferenceKey.self) { preferences in
+                // 在过滤器变化期间忽略 sticky 状态变化
+                if isFilterChanging {
+                    print("[STICKY-DEBUG] Ignoring sticky state change during filter transition")
+                    return
+                }
+
                 let _ = print("onPreferenceChange on pin state change")
                 if let isSticky = preferences["categoryFilter"] {
                     if categoryFilterSticky != isSticky {
@@ -141,6 +160,16 @@ struct TransactionListView: View {
                     print("[SCROLL-DEBUG] scrollOffset:\(String(format: "%.1f", offset)) isCollapsed:\(isCollapsed)")
                 }
             }
+            .onChange(of: selectedFilter) { newFilter in
+                print("[FILTER-DEBUG] Filter changed to: \(newFilter) - categoryFilterSticky: \(categoryFilterSticky)")
+
+                // 现在过滤器变化只影响 FilteredTransactionsList，不会导致整个视图重建
+                // 因此不需要复杂的防滚动逻辑，只需要简单的防抖即可
+                isFilterChanging = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isFilterChanging = false
+                }
+            }
         }
         .sheet(item: $editingTransaction) { transaction in
             AddTransactionView(
@@ -151,45 +180,15 @@ struct TransactionListView: View {
             )
         }
     }
-    
-    @ViewBuilder
-    private func transactionRow(for transaction: Transaction) -> some View {
-        TransactionRowView(transaction: transaction)
-            .listRowInsets(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-            .transition(.asymmetric(
-                insertion: .scale.combined(with: .opacity),
-                removal: .scale(scale: 0.8).combined(with: .opacity)
-            ))
-            .opacity(deletingTransactionId == transaction.id ? 0.3 : 1.0)
-            .scaleEffect(deletingTransactionId == transaction.id ? 0.8 : 1.0)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: deletingTransactionId)
-            .contextMenu {
-                Button("编辑", systemImage: "pencil") {
-                    // 轻触觉反馈
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    editingTransaction = transaction
-                }
-
-                Button("删除", systemImage: "trash", role: .destructive) {
-                    // 重触觉反馈
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        deletingTransactionId = transaction.id
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        store.deleteTransaction(transaction)
-                        deletingTransactionId = nil
-                    }
-                }
-            }
-    }
 
     // MARK: - CategoryFilterView Sticky Handler
     private func onCategoryFilterViewSticky(_ isSticky: Bool) {
+        // 在过滤器变化期间忽略 sticky 状态变化
+        if isFilterChanging {
+            print("[STICKY-DEBUG] Ignoring sticky state change during filter transition - isSticky: \(isSticky)")
+            return
+        }
+
         print("[STICKY-DEBUG] onCategoryFilterViewSticky called with isSticky: \(isSticky)")
 
         // 在这里可以根据 CategoryFilterView 的 pinned 状态来控制 MonthlySummaryView 的显示/隐藏
@@ -346,6 +345,60 @@ struct TransactionRowView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Filtered Transactions List Component
+struct FilteredTransactionsList: View {
+    let transactions: [Transaction]
+    let selectedFilter: FilterType
+    let onEditTransaction: (Transaction) -> Void
+    let onDeleteTransaction: (Transaction) -> Void
+    let deletingTransactionId: UUID?
+
+    // 过滤逻辑只在这个组件内部，不影响父组件
+    private var filteredTransactions: [Transaction] {
+        let filtered = transactions
+            .filter { selectedFilter.matches(transaction: $0) }
+            .sorted { $0.date > $1.date }
+
+        print("[FILTER-LIST-DEBUG] Filtered \(transactions.count) -> \(filtered.count) transactions for filter: \(selectedFilter)")
+        return filtered
+    }
+
+    var body: some View {
+        let _ = print("[FILTER-LIST-DEBUG] FilteredTransactionsList body render for filter: \(selectedFilter)")
+
+        LazyVStack(spacing: 4) {
+            ForEach(filteredTransactions) { transaction in
+                TransactionRowView(transaction: transaction)
+                    .listRowInsets(EdgeInsets(top: 1, leading: 2, bottom: 1, trailing: 2))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale(scale: 0.8).combined(with: .opacity)
+                    ))
+                    .opacity(deletingTransactionId == transaction.id ? 0.3 : 1.0)
+                    .scaleEffect(deletingTransactionId == transaction.id ? 0.8 : 1.0)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.8), value: deletingTransactionId)
+                    .contextMenu {
+                        Button("编辑", systemImage: "pencil") {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                            impactFeedback.impactOccurred()
+                            onEditTransaction(transaction)
+                        }
+
+                        Button("删除", systemImage: "trash", role: .destructive) {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            onDeleteTransaction(transaction)
+                        }
+                    }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.bottom, 1)
     }
 }
 
