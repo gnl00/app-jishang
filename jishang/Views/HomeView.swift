@@ -15,9 +15,10 @@ struct HomeView: View {
     @State private var voiceInputType: TransactionType = .expense
     
     // Collapsing MonthlySummary
-    @State private var summaryHeight: CGFloat = 0
-    @State private var summaryMinY: CGFloat = 0
-    @State private var collapseProgress: Double = 0.0
+    @State private var isCollapsed: Bool = false
+    @State private var lastScrollOffset: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
+    @State private var layoutChangeTime: Date = Date() // 记录布局变化时间
     
     // Inline list edit/delete support
     @State private var editingTransaction: Transaction?
@@ -55,11 +56,33 @@ struct HomeView: View {
                 GeometryReader { outer in
                     let viewportHeight = outer.size.height
                     Group {
-                        ScrollView {
-                            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
-                                // Collapsible Monthly Summary
-                                monthlySummaryCollapsible
-                                    .padding(.top, 8)
+                        ScrollViewReader { scrollProxy in
+                            ScrollView {
+                                LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                                    // Scroll tracking element at the top
+                                    Rectangle()
+                                        .fill(Color.clear)
+                                        .frame(height: 1)
+                                        .id("scrollTop")
+                                        .background(
+                                            GeometryReader { proxy in
+                                                let offset = proxy.frame(in: .global).minY
+                                                let _ = print("GeometryReader global offset: \(offset)")
+
+                                                // 直接调用处理函数而不是使用 PreferenceKey
+                                                DispatchQueue.main.async {
+                                                    handleScrollChange(offset: offset, viewportHeight: viewportHeight)
+                                                }
+
+                                                return Color.clear
+                                            }
+                                        )
+
+                                    // Collapsible Monthly Summary
+                                    if !isCollapsed {
+                                        monthlySummarySimple
+                                            .padding(.top, 8)
+                                    }
 
                                 // Sticky Category Filter + Transaction rows
                                 Section {
@@ -73,18 +96,19 @@ struct HomeView: View {
                                     .padding(.horizontal, 8)
                                 } header: {
                                     VStack(spacing: 0) {
-                                        let _  = print("collapseProgress: \(collapseProgress)")
-
                                         // 折叠后的月度总览组件 - 包含占位元素和展开按钮
-                                        if collapseProgress > 0.6 {
+                                        let _ = print("isCollapsed: \(isCollapsed)")
+                                        if isCollapsed {
                                             CollapsedSummaryView {
-                                                // TODO: 添加展开MonthlySummaryView的逻辑
+                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                    isCollapsed = false
+                                                }
                                             }
                                             .transition(.asymmetric(
                                                 insertion: .movingParts.boing,
                                                 removal: .move(edge: .top).combined(with: .opacity)
                                             ))
-                                            .zIndex(1) // 确保正确的层级
+                                            .zIndex(1)
                                         }
 
                                         CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
@@ -98,12 +122,13 @@ struct HomeView: View {
                                                 Divider().opacity(0.6)
                                             }
                                     }
-                                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: collapseProgress > 0.6)
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isCollapsed)
                                 }
+                                }
+                                // Ensure enough content height to avoid rubber-banding when list is short,
+                                // and keep content aligned to top instead of vertically centering.
+                                .frame(minWidth: 0, maxWidth: .infinity, minHeight: viewportHeight, alignment: .top)
                             }
-                            // Ensure enough content height to avoid rubber-banding when list is short,
-                            // and keep content aligned to top instead of vertically centering.
-                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: viewportHeight, alignment: .top)
                         }
                         .coordinateSpace(name: "homeScroll")
                         // Avoid bouncing when content is not taller than the viewport (iOS 16+)
@@ -187,77 +212,79 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Collapsible Monthly Summary
+// MARK: - Monthly Summary
 extension HomeView {
-    private var monthlySummaryCollapsible: some View {
-        let effectiveHeight = max(0, summaryHeight - max(0, -summaryMinY))
-        let progress = summaryHeight > 0 ? 1 - (effectiveHeight / summaryHeight) : 0
-        return MonthlySummaryView(store: transactionStore)
-            // Measure intrinsic height BEFORE frame applied
-            .background(
-                GeometryReader { proxy in
-                    Color.clear
-                        .preference(key: SummaryHeightPreferenceKey.self, value: proxy.size.height)
-                }
-            )
-            // Track vertical offset in scroll space BEFORE frame applied
-            .background(
-                GeometryReader { proxy in
-                    let minY = proxy.frame(in: .named("homeScroll")).minY
-                    let _ = print("GeometryReader minY: \(minY)")
+    private var monthlySummarySimple: some View {
+        MonthlySummaryView(store: transactionStore)
+            .transition(.asymmetric(
+                insertion: .scale.combined(with: .opacity),
+                removal: .scale(scale: 0.95).combined(with: .opacity)
+            ))
+    }
 
-                    // 使用Task来安全地更新状态
-                    Task { @MainActor in
-                        if summaryMinY != minY {
-                            summaryMinY = minY
-                            updateCollapseProgress()
-                        }
-                    }
+    private func handleScrollChange(offset: CGFloat, viewportHeight: CGFloat) {
+        let _ = print("lastScrollOffset:\(lastScrollOffset) scrollOffset:\(scrollOffset) offset:\(offset)")
 
-                    return Color.clear
-                        .preference(key: SummaryMinYPreferenceKey.self, value: minY)
-                }
-            )
-            // Visual refinement when collapsing
-            .opacity(max(0.0, 1.0 - progress * 1.2))
-            .scaleEffect(x: 1.0, y: max(0.85, 1.0 - progress * 0.1), anchor: .top)
-            .frame(height: summaryHeight == 0 ? nil : effectiveHeight)
-            .clipped(antialiased: true)
-            .onPreferenceChange(SummaryHeightPreferenceKey.self) {
-                self.summaryHeight = $0
-                // 当高度变化时也更新进度
-                self.updateCollapseProgress()
+        // 首次调用时记录初始偏移量
+        if lastScrollOffset == 0 && scrollOffset == 0 {
+            lastScrollOffset = offset
+            scrollOffset = offset
+            return
+        }
+
+        let scrollDelta = offset - lastScrollOffset
+        let now = Date()
+
+        // 检测异常的位置跳跃（布局变化引起），忽略这些变化
+        if abs(scrollDelta) > 100 {
+            let _ = print("位置跳跃检测: \(scrollDelta)，重置基准")
+            layoutChangeTime = now // 记录布局变化时间
+            lastScrollOffset = offset
+            scrollOffset = offset
+            return
+        }
+
+        // 布局变化后短时间内的滚动检测需要更宽松的条件
+        let timeSinceLayoutChange = now.timeIntervalSince(layoutChangeTime)
+        let isRecentLayoutChange = timeSinceLayoutChange < 0.3
+
+        lastScrollOffset = offset
+        scrollOffset = offset
+
+        // 使用全局坐标，较小的 offset 表示向上滚动了更多
+        let isScrollingUp = scrollDelta < -3
+        let isScrollingDown = scrollDelta > 3 // 新增：检测向下滚动
+
+        // 动态调整折叠阈值：最近有布局变化时使用更宽松的条件
+        let collapseThreshold: CGFloat = isRecentLayoutChange ? 150 : 80
+        let hasScrolledEnough = offset < collapseThreshold
+
+        let _ = print("scrollDelta:\(scrollDelta) isScrollingUp:\(isScrollingUp) isScrollingDown:\(isScrollingDown) hasScrolledEnough:\(hasScrolledEnough) isCollapsed:\(isCollapsed) timeSince:\(timeSinceLayoutChange)")
+
+        // 折叠逻辑
+        if isScrollingUp && hasScrolledEnough && !isCollapsed {
+            layoutChangeTime = now // 状态改变时更新时间
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                isCollapsed = true
             }
-            .onPreferenceChange(SummaryMinYPreferenceKey.self) {
-                self.summaryMinY = $0
-                // 当位置变化时更新进度
-                self.updateCollapseProgress()
+        }
+
+        // 展开逻辑：优化为更响应的条件
+        // 1. 用户主动向下滚动到顶部附近 - 立即响应
+        // 2. 或者布局稳定后的静态位置检查
+        let shouldExpandForUserPull = isScrollingDown && offset > 250 && isCollapsed
+        let shouldExpandForPosition = offset > 200 && isCollapsed && !isRecentLayoutChange
+
+        if shouldExpandForUserPull || shouldExpandForPosition {
+            let _ = print("展开触发 - 用户下拉:\(shouldExpandForUserPull) 位置检查:\(shouldExpandForPosition)")
+            layoutChangeTime = now // 状态改变时更新时间
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                isCollapsed = false
             }
-    }
-
-    private func updateCollapseProgress() {
-        let effectiveHeight = max(0, summaryHeight - max(0, -summaryMinY))
-        let newProgress = summaryHeight > 0 ? 1 - (effectiveHeight / summaryHeight) : 0
-        print("updateCollapseProgress - summaryHeight: \(summaryHeight), summaryMinY: \(summaryMinY), effectiveHeight: \(effectiveHeight), newProgress: \(newProgress)")
-        collapseProgress = newProgress
+        }
     }
 }
 
-private struct SummaryHeightPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        // Use the first non-zero reading
-        let new = nextValue()
-        if value == 0 { value = new }
-    }
-}
-
-private struct SummaryMinYPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
 
 // MARK: - Transaction Row Wrapper
 extension HomeView {
