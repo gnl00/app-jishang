@@ -52,55 +52,65 @@ struct HomeView: View {
                 .padding(.bottom, 6)
                 
                 // Scrollable content: MonthlySummary (collapsible) + CategoryFilter (sticky) + Transactions
-                ScrollView {
-                    LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
-                        // Collapsible Monthly Summary
-                        monthlySummaryCollapsible
-                            .padding(.top, 8)
-                        
-                        // Sticky Category Filter + Transaction rows
-                        Section {
-                            LazyVStack(spacing: 4) {
-                                ForEach(filteredTransactions) { transaction in
-                                    transactionRow(for: transaction)
-                                }
-                                .animation(.default, value: filteredTransactions.count)
-                                .padding(.bottom, 1)
-                            }
-                            .padding(.horizontal, 8)
-                        } header: {
-                            VStack(spacing: 0) {
-                                let _  = print("collapseProgress: \(collapseProgress)")
+                GeometryReader { outer in
+                    let viewportHeight = outer.size.height
+                    Group {
+                        ScrollView {
+                            LazyVStack(spacing: 12, pinnedViews: [.sectionHeaders]) {
+                                // Collapsible Monthly Summary
+                                monthlySummaryCollapsible
+                                    .padding(.top, 8)
 
-                                // 折叠后的月度总览组件 - 包含占位元素和展开按钮
-                                if collapseProgress > 0.6 {
-                                    CollapsedSummaryView {
-                                        // TODO: 添加展开MonthlySummaryView的逻辑
+                                // Sticky Category Filter + Transaction rows
+                                Section {
+                                    LazyVStack(spacing: 4) {
+                                        ForEach(filteredTransactions) { transaction in
+                                            transactionRow(for: transaction)
+                                        }
+                                        .animation(.default, value: filteredTransactions.count)
+                                        .padding(.bottom, 1)
                                     }
-                                    .transition(.asymmetric(
-                                        insertion: .movingParts.boing,
-                                        removal: .move(edge: .top).combined(with: .opacity)
-                                    ))
-                                    .zIndex(1) // 确保正确的层级
-                                }
+                                    .padding(.horizontal, 8)
+                                } header: {
+                                    VStack(spacing: 0) {
+                                        let _  = print("collapseProgress: \(collapseProgress)")
 
-                                CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
-                                    .padding(.bottom, 4)
-                                    .background(
-                                        // Solid background when pinned
-                                        Color(.systemGroupedBackground)
-                                            .ignoresSafeArea()
-                                    )
-                                    .overlay(alignment: .bottom) {
-                                        Divider().opacity(0.6)
+                                        // 折叠后的月度总览组件 - 包含占位元素和展开按钮
+                                        if collapseProgress > 0.6 {
+                                            CollapsedSummaryView {
+                                                // TODO: 添加展开MonthlySummaryView的逻辑
+                                            }
+                                            .transition(.asymmetric(
+                                                insertion: .movingParts.boing,
+                                                removal: .move(edge: .top).combined(with: .opacity)
+                                            ))
+                                            .zIndex(1) // 确保正确的层级
+                                        }
+
+                                        CategoryFilterView(store: transactionStore, selectedFilter: $selectedFilter)
+                                            .padding(.bottom, 4)
+                                            .background(
+                                                // Solid background when pinned
+                                                Color(.systemGroupedBackground)
+                                                    .ignoresSafeArea()
+                                            )
+                                            .overlay(alignment: .bottom) {
+                                                Divider().opacity(0.6)
+                                            }
                                     }
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: collapseProgress > 0.6)
+                                }
                             }
-                            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: collapseProgress > 0.6)
+                            // Ensure enough content height to avoid rubber-banding when list is short,
+                            // and keep content aligned to top instead of vertically centering.
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: viewportHeight, alignment: .top)
                         }
+                        .coordinateSpace(name: "homeScroll")
+                        // Avoid bouncing when content is not taller than the viewport (iOS 16+)
+                        .applyBasedOnSizeBounce()
+                        .background(Color(.systemGroupedBackground))
                     }
                 }
-                .coordinateSpace(name: "homeScroll")
-                .background(Color(.systemGroupedBackground))
             }
             .navigationBarTitleDisplayMode(.inline)
             // Sheet: add income/expense
@@ -349,4 +359,17 @@ struct CollapsedSummaryView: View {
 #Preview {
     HomeView()
         .environmentObject(TransactionStore())
+}
+
+// MARK: - Helpers
+private extension View {
+    // Conditionally apply .scrollBounceBehavior(.basedOnSize) when available
+    @ViewBuilder
+    func applyBasedOnSizeBounce() -> some View {
+        if #available(iOS 16.0, *) {
+            self.scrollBounceBehavior(.basedOnSize)
+        } else {
+            self
+        }
+    }
 }
