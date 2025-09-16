@@ -180,6 +180,7 @@ struct CollapsedSummaryView: View {
                 }
                 .foregroundColor(.secondary)
                 .padding(.vertical, 12)
+                .padding(.horizontal, 20)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
                         .fill(Color(.systemBackground))

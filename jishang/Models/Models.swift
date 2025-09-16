@@ -29,6 +29,11 @@ extension Double {
         return String(format: "¥%.1f", self)
     }
     
+    /// 格式化为一位小数货币 (例：¥123.4)
+    var currencyFormattedTwoDecimal: String {
+        return String(format: "¥%.2f", self)
+    }
+    
     /// 格式化为百分比，一位小数 (例：12.3%)
     var percentFormattedOneDecimal: String {
         return String(format: "%.1f%%", self)
@@ -37,6 +42,15 @@ extension Double {
     /// 格式化为百分比，整数 (例：12%)
     var percentFormattedInt: String {
         return String(format: "%.0f%%", self)
+    }
+
+    /// 格式化为简短货币 (例：¥1.2k, ¥123)
+    var currencyFormattedShort: String {
+        if self >= 1000 {
+            return String(format: "¥%.1fk", self / 1000)
+        } else {
+            return String(format: "¥%.0f", self)
+        }
     }
 }
 

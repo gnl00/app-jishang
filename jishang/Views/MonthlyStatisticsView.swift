@@ -511,7 +511,7 @@ struct ConsumptionTrendView: View {
                             )
                         )
                         .frame(width: 8, height: 8)
-                    Text("收入: \(displayIncome.currencyFormattedInt)")
+                    Text("收入: \(displayIncome.currencyFormattedTwoDecimal)")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
@@ -528,7 +528,7 @@ struct ConsumptionTrendView: View {
                             )
                         )
                         .frame(width: 8, height: 8)
-                    Text("支出: \(displayExpense.currencyFormattedInt)")
+                    Text("支出: \(displayExpense.currencyFormattedTwoDecimal)")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
                 }
