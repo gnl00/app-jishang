@@ -40,6 +40,11 @@ struct TransactionListView: View {
         ScrollViewReader { scrollProxy in
             ScrollView {
                 LazyVStack(spacing: 8, pinnedViews: [.sectionHeaders]) {
+                    // 添加滚动锚点
+                    Color.clear
+                        .frame(height: 0)
+                        .id("top")
+
                     Section {
                         // Transactions - 使用独立组件处理过滤和渲染
                         FilteredTransactionsList(
@@ -147,18 +152,23 @@ struct TransactionListView: View {
                     print("[SCROLL-DEBUG] scrollOffset:\(String(format: "%.1f", newValue)) direction:\(scrollDirection) isCollapsed:\(isCollapsed)")
                 }
             }
-        }
-        .onChange(of: selectedFilter) { oldFilter, newFilter in
-            print("[FILTER-CHANGE] Filter changed from '\(oldFilter.displayName)' to '\(newFilter.displayName)'")
+            .onChange(of: selectedFilter) { oldFilter, newFilter in
+                print("[FILTER-CHANGE] Filter changed from '\(oldFilter.displayName)' to '\(newFilter.displayName)'")
 
-            // 设置filter变化保护期
-            isFilterChanging = true
-            lastFilterChangeTime = Date()
+                // 设置filter变化保护期
+                isFilterChanging = true
+                lastFilterChangeTime = Date()
 
-            // 延迟重置保护期，给内容变化足够的时间
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                isFilterChanging = false
-                print("[FILTER-CHANGE] Filter change protection period ended")
+                // ScrollToTop when filter changes
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    scrollProxy.scrollTo("top", anchor: .top)
+                }
+
+                // 延迟重置保护期，给内容变化足够的时间
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    isFilterChanging = false
+                    print("[FILTER-CHANGE] Filter change protection period ended")
+                }
             }
         }
         .sheet(item: $editingTransaction) { transaction in
@@ -373,6 +383,7 @@ struct FilteredTransactionsList: View {
             }
         }
         .padding(.horizontal, 8)
+        .padding(.top, 4)  // 添加顶部间距，避开固定的 CategoryFilterView
         .padding(.bottom, 1)
         .frame(minHeight: 240) // 确保至少有 3 行交易的高度
     }
