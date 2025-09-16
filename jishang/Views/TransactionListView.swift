@@ -10,7 +10,7 @@ import Pow
 
 struct TransactionListView: View {
     @ObservedObject var store: TransactionStore
-    @Binding var selectedFilter: FilterType
+    let selectedFilter: FilterType  // 改为只读
     @Binding var isCollapsed: Bool
 
     @State private var editingTransaction: Transaction?
@@ -23,64 +23,35 @@ struct TransactionListView: View {
     @State private var scrollDirection: ScrollDirection = .none
     @State private var isStateChanging: Bool = false  // 状态变化保护期
     @State private var lastStateChangeTime: Date = Date()
-    @State private var isFilterChanging: Bool = false  // filter变化保护期
-    @State private var lastFilterChangeTime: Date = Date()
-    @State private var isScrollingToTop: Bool = false  // scrollToTop保护期
-    @State private var lastScrollToTopTime: Date = Date()
 
     enum ScrollDirection {
         case up      // 上滑
         case down    // 下拉
         case none    // 无滚动
     }
-    
-
-    // 移除 filteredTransactions 计算属性，过滤逻辑下沉到子组件
 
     var body: some View {
         let _ = print("[DEBUG] TransactionListView body render - isCollapsed: \(isCollapsed)")
         ScrollViewReader { scrollProxy in
             ScrollView {
-                LazyVStack(spacing: 8, pinnedViews: [.sectionHeaders]) {
-                    // 添加滚动锚点
-                    Color.clear
-                        .frame(height: 0)
-                        .id("top")
-
-                    Section {
-                        // Transactions - 使用独立组件处理过滤和渲染
-                        FilteredTransactionsList(
-                            transactions: store.transactions,
-                            selectedFilter: selectedFilter,
-                            onEditTransaction: { transaction in
-                                editingTransaction = transaction
-                            },
-                            onDeleteTransaction: { transaction in
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    deletingTransactionId = transaction.id
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    store.deleteTransaction(transaction)
-                                    deletingTransactionId = nil
-                                }
-                            },
-                            deletingTransactionId: deletingTransactionId
-                        )
-                    } header: {
-                        CategoryFilterView(
-                            store: store,
-                            selectedFilter: $selectedFilter
-                        )
-                        .padding(.top, 8)      // 顶部内边距，避免与状态栏重叠
-                        .padding(.bottom, 12)  // 增加底部内边距，为下方内容留出空间
-                        .background(
-                            Color(.systemGroupedBackground)
-                                .ignoresSafeArea()
-                        )
-                        .overlay(alignment: .bottom) {
-                            Divider().opacity(0.6)
-                        }
-                    }
+                LazyVStack(spacing: 8) {
+                    FilteredTransactionsList(
+                        transactions: store.transactions,
+                        selectedFilter: selectedFilter,
+                        onEditTransaction: { transaction in
+                            editingTransaction = transaction
+                        },
+                        onDeleteTransaction: { transaction in
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                deletingTransactionId = transaction.id
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                store.deleteTransaction(transaction)
+                                deletingTransactionId = nil
+                            }
+                        },
+                        deletingTransactionId: deletingTransactionId
+                    )
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
             }
@@ -91,19 +62,9 @@ struct TransactionListView: View {
             } action: { oldValue, newValue in
                 let currentTime = Date()
 
-                // 在各种保护期内忽略滚动检测
+                // 在状态变化保护期内忽略滚动检测
                 if isStateChanging || currentTime.timeIntervalSince(lastStateChangeTime) < 0.5 {
                     print("[SCROLL-DEBUG] Ignoring scroll during state change protection period")
-                    return
-                }
-
-                if isFilterChanging || currentTime.timeIntervalSince(lastFilterChangeTime) < 0.8 {
-                    print("[SCROLL-DEBUG] Ignoring scroll during filter change protection period")
-                    return
-                }
-
-                if isScrollingToTop || currentTime.timeIntervalSince(lastScrollToTopTime) < 0.6 {
-                    print("[SCROLL-DEBUG] Ignoring scroll during scrollToTop protection period")
                     return
                 }
 
@@ -157,33 +118,6 @@ struct TransactionListView: View {
                 if bucket != lastLoggedBucket {
                     lastLoggedBucket = bucket
                     print("[SCROLL-DEBUG] scrollOffset:\(String(format: "%.1f", newValue)) direction:\(scrollDirection) isCollapsed:\(isCollapsed)")
-                }
-            }
-            .onChange(of: selectedFilter) { oldFilter, newFilter in
-                print("[FILTER-CHANGE] Filter changed from '\(oldFilter.displayName)' to '\(newFilter.displayName)'")
-
-                let currentTime = Date()
-
-                // 设置各种保护期
-                isFilterChanging = true
-                lastFilterChangeTime = currentTime
-                isScrollingToTop = true
-                lastScrollToTopTime = currentTime
-
-                // ScrollToTop when filter changes
-                withAnimation(.easeInOut(duration: 0.4)) {
-                    scrollProxy.scrollTo("top", anchor: .top)
-                }
-
-                // 延迟重置保护期，给内容变化和动画足够的时间
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    isFilterChanging = false
-                    print("[FILTER-CHANGE] Filter change protection period ended")
-                }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    isScrollingToTop = false
-                    print("[SCROLL-TO-TOP] ScrollToTop protection period ended")
                 }
             }
         }
@@ -399,8 +333,7 @@ struct FilteredTransactionsList: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.top, 4)  // 添加顶部间距，避开固定的 CategoryFilterView
-        .padding(.bottom, 1)
+        .padding(.vertical, 8)  // 简化为统一的垂直间距
         .frame(minHeight: 240) // 确保至少有 3 行交易的高度
     }
 }
@@ -442,9 +375,6 @@ struct TriangleCornerBottomRight: View {
 }
 
 // MARK: - Utilities
-// ScrollOffsetKey 已移除，使用 iOS 18 的 onScrollGeometryChange 替代
-
-
 #if canImport(SwiftUI)
 private extension View {
     @ViewBuilder
@@ -476,7 +406,7 @@ private extension View {
     let store = TransactionStore()
     return TransactionListView(
         store: store,
-        selectedFilter: .constant(.all),
+        selectedFilter: .all,
         isCollapsed: .constant(false)
     )
 }

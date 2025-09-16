@@ -17,8 +17,6 @@ struct HomeView: View {
     // MonthlySummaryView 折叠状态管理
     @State private var isCollapsed: Bool = false
     
-    // 列表数据下放到 TransactionListView 内部计算（折叠状态已内聚到子视图）
-    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -41,7 +39,6 @@ struct HomeView: View {
                 .padding(.top)
                 .padding(.bottom, 6)
 
-                // MonthlySummaryView 独立布局（不在 ScrollView 内）
                 if !isCollapsed {
                     MonthlySummaryView(store: transactionStore)
                         .padding(.top, 8)
@@ -54,7 +51,6 @@ struct HomeView: View {
                         )
                 }
 
-                // CollapsedSummaryView 独立布局（不在 ScrollView 内）
                 if isCollapsed {
                     CollapsedSummaryView {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -66,10 +62,16 @@ struct HomeView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                // Transaction list - 移除内部的折叠逻辑
+                CategoryFilterView(
+                    store: transactionStore,
+                    selectedFilter: $selectedFilter
+                )
+                .background(Color(.systemGroupedBackground))
+                .zIndex(1)
+
                 TransactionListView(
                     store: transactionStore,
-                    selectedFilter: $selectedFilter,
+                    selectedFilter: selectedFilter,
                     isCollapsed: $isCollapsed
                 )
                 .background(Color(.systemGroupedBackground))
@@ -95,8 +97,6 @@ struct HomeView: View {
                     handleVoiceResult(voiceText)
                 }
             }
-            // Sheet: edit transaction
-            // 移除：行内编辑在 TransactionListView 内处理
         }
     }
     
@@ -141,8 +141,6 @@ struct HomeView: View {
         }
     }
 }
-
-// 移除：滚动/几何相关扩展与行包装均下放到 TransactionListView
 
 // MARK: - Collapsed Summary View
 struct CollapsedSummaryView: View {
