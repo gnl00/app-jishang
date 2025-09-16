@@ -527,7 +527,7 @@ struct NetWorthTrendView: View {
                 goalEditCard
             }
         }
-        .transition(.movingParts.flip)
+        .transition(.move(edge: .leading))
         .onTapGesture(count: 2) {
             withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 isFlipped.toggle()
