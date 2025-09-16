@@ -25,6 +25,8 @@ struct TransactionListView: View {
     @State private var lastStateChangeTime: Date = Date()
     @State private var isFilterChanging: Bool = false  // filter变化保护期
     @State private var lastFilterChangeTime: Date = Date()
+    @State private var isScrollingToTop: Bool = false  // scrollToTop保护期
+    @State private var lastScrollToTopTime: Date = Date()
 
     enum ScrollDirection {
         case up      // 上滑
@@ -89,7 +91,7 @@ struct TransactionListView: View {
             } action: { oldValue, newValue in
                 let currentTime = Date()
 
-                // 在状态变化或filter变化保护期内忽略滚动检测
+                // 在各种保护期内忽略滚动检测
                 if isStateChanging || currentTime.timeIntervalSince(lastStateChangeTime) < 0.5 {
                     print("[SCROLL-DEBUG] Ignoring scroll during state change protection period")
                     return
@@ -97,6 +99,11 @@ struct TransactionListView: View {
 
                 if isFilterChanging || currentTime.timeIntervalSince(lastFilterChangeTime) < 0.8 {
                     print("[SCROLL-DEBUG] Ignoring scroll during filter change protection period")
+                    return
+                }
+
+                if isScrollingToTop || currentTime.timeIntervalSince(lastScrollToTopTime) < 0.6 {
+                    print("[SCROLL-DEBUG] Ignoring scroll during scrollToTop protection period")
                     return
                 }
 
@@ -155,19 +162,28 @@ struct TransactionListView: View {
             .onChange(of: selectedFilter) { oldFilter, newFilter in
                 print("[FILTER-CHANGE] Filter changed from '\(oldFilter.displayName)' to '\(newFilter.displayName)'")
 
-                // 设置filter变化保护期
+                let currentTime = Date()
+
+                // 设置各种保护期
                 isFilterChanging = true
-                lastFilterChangeTime = Date()
+                lastFilterChangeTime = currentTime
+                isScrollingToTop = true
+                lastScrollToTopTime = currentTime
 
                 // ScrollToTop when filter changes
                 withAnimation(.easeInOut(duration: 0.4)) {
                     scrollProxy.scrollTo("top", anchor: .top)
                 }
 
-                // 延迟重置保护期，给内容变化足够的时间
+                // 延迟重置保护期，给内容变化和动画足够的时间
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                     isFilterChanging = false
                     print("[FILTER-CHANGE] Filter change protection period ended")
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    isScrollingToTop = false
+                    print("[SCROLL-TO-TOP] ScrollToTop protection period ended")
                 }
             }
         }
