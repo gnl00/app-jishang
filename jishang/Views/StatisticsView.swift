@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Pow
 
 struct StatisticsView: View {
     @EnvironmentObject var transactionStore: TransactionStore
@@ -519,27 +520,16 @@ struct NetWorthTrendView: View {
     }
 
     var body: some View {
-        ZStack {
-            // 正面 - 目标进度显示
+        Group {
             if !isFlipped {
                 goalProgressCard
-                    .rotation3DEffect(
-                        .degrees(isFlipped ? 180 : 0),
-                        axis: (x: 0, y: 1, z: 0)
-                    )
-            }
-
-            // 背面 - 编辑界面
-            if isFlipped {
+            } else {
                 goalEditCard
-                    .rotation3DEffect(
-                        .degrees(isFlipped ? 0 : -180),
-                        axis: (x: 0, y: 1, z: 0)
-                    )
             }
         }
+        .transition(.movingParts.flip)
         .onTapGesture(count: 2) {
-            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                 isFlipped.toggle()
                 if isFlipped {
                     newGoalText = String(format: "%.0f", targetAmount)
@@ -729,8 +719,8 @@ struct NetWorthTrendView: View {
             impactFeedback.impactOccurred()
         }
 
-        // 翻转回正面
-        withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+        // 翻转回正面 - 使用优化的动画参数
+        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
             isFlipped = false
         }
     }
