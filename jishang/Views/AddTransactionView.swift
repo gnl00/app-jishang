@@ -50,6 +50,43 @@ struct AddTransactionView: View {
             }
         }
     }
+
+    // 分页逻辑：当分类数量超过8个时才分页，否则单页显示
+    private var categoryPages: [[Category]] {
+        let categories = filteredCategories
+
+        // 如果分类少于等于8个，单页显示所有分类
+        if categories.count <= 8 {
+            return [categories]
+        }
+
+        // 分类较多时，每页8个分类（2行4列）
+        let categoriesPerPage = 8
+        var pages: [[Category]] = []
+
+        for i in stride(from: 0, to: categories.count, by: categoriesPerPage) {
+            let endIndex = min(i + categoriesPerPage, categories.count)
+            let pageCategories = Array(categories[i..<endIndex])
+            pages.append(pageCategories)
+        }
+
+        // 如果没有分类，至少要有一页
+        if pages.isEmpty {
+            pages.append([])
+        }
+
+        return pages
+    }
+
+    // 是否需要分页显示
+    private var shouldUsePaging: Bool {
+        return filteredCategories.count > 8
+    }
+
+    // 固定TabView高度：始终显示2行
+    private var fixedTabViewHeight: CGFloat {
+        return CGFloat(2 * 75) // 2行，每行75pt（60pt分类高度 + 15pt间距）
+    }
     
     private var isValidInput: Bool {
         guard let amountValue = Double(amount), amountValue > 0,
@@ -65,13 +102,30 @@ struct AddTransactionView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 24) {
-                headerSection
-                inputSections
-                Spacer()
-                actionButtons
+            VStack(spacing: 0) {
+                // 固定顶部区域
+                VStack(spacing: 20) {
+                    headerSection
+                    amountSection  // TextField 永远固定在可见区域
+                }
+                .padding(.horizontal)
+                .padding(.top)
+                .background(Color(.systemBackground))
+
+                // 分页分类选择器
+                pagedCategorySection
+                    .padding(.top, 16)
+
+                // 固定底部区域
+                VStack(spacing: 16) {
+                    noteSection
+                    dateSection
+                    actionButtons
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+                .background(Color(.systemBackground))
             }
-            .padding()
             .navigationBarHidden(true)
             .transition(.slide.animation(.spring(response: 0.5, dampingFraction: 0.8)))
         }
@@ -123,13 +177,112 @@ struct AddTransactionView: View {
         .padding(.top)
     }
     
-    private var inputSections: some View {
-        VStack(spacing: 20) {
-            amountSection
-            categorySection
-            noteSection
-            dateSection
+    // 新的分页分类选择器
+    private var pagedCategorySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // 分类标题
+            HStack {
+                Text("分类")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.secondary)
+                Spacer()
+
+                // 页面指示器文本（只有多页时显示）
+                if categoryPages.count > 1 {
+                    Text("第 1 页，共 \(categoryPages.count) 页")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 20)
+
+            // 分页视图（只展示分类）
+            TabView {
+                ForEach(0..<categoryPages.count, id: \.self) { pageIndex in
+                    CategoryPageView(
+                        categories: categoryPages[pageIndex],
+                        selectedCategory: $selectedCategory,
+                        isDeleteMode: $isDeleteMode,
+                        onCategorySelected: { category in
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                            selectedCategory = category
+                        },
+                        onDeleteCategory: { category in
+                            store.deleteCategoryAndReassign(category)
+                            if selectedCategory?.id == category.id {
+                                selectedCategory = filteredCategories.first
+                            }
+                        },
+                        onAddCategory: {
+                            showAddCategory = true
+                        }
+                    )
+                    .tag(pageIndex)
+                }
+            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: categoryPages.count > 1 ? .always : .never))
+            .frame(height: fixedTabViewHeight) // 固定高度：始终2行
+            .background(Color(.systemBackground))
+
+            // 固定操作按钮区域（独立于分页）
+            operationButtonsSection
         }
+    }
+
+    // 操作按钮区域
+    private var operationButtonsSection: some View {
+        HStack(spacing: 8) {
+            // 添加类别按钮
+            Button(action: {
+                showAddCategory = true
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.blue)
+
+                    Text("添加分类")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.blue)
+                }
+                .frame(height: 40)
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                )
+            }
+
+            // 删除类别按钮
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isDeleteMode.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "minus.circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(isDeleteMode ? .white : .red)
+
+                    Text("删除分类")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isDeleteMode ? .white : .red)
+                }
+                .frame(height: 40)
+                .frame(maxWidth: .infinity)
+                .background(isDeleteMode ? Color.red : Color(.systemGray6))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isDeleteMode ? Color.red : Color.red.opacity(0.3), lineWidth: 1)
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
     }
     
     private var amountSection: some View {
@@ -351,6 +504,92 @@ struct AddTransactionView: View {
         }
         
         editingTransaction = nil
+    }
+}
+
+// MARK: - Category Page View
+struct CategoryPageView: View {
+    let categories: [Category]
+    @Binding var selectedCategory: Category?
+    @Binding var isDeleteMode: Bool
+
+    let onCategorySelected: (Category) -> Void
+    let onDeleteCategory: (Category) -> Void
+    let onAddCategory: () -> Void
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 12) {
+            // 显示当前页的分类
+            ForEach(categories, id: \.id) { category in
+                ZStack(alignment: .topTrailing) {
+                    CategoryButton(
+                        category: category,
+                        isSelected: selectedCategory?.id == category.id
+                    ) {
+                        if !isDeleteMode {
+                            onCategorySelected(category)
+                        }
+                    }
+
+                    // 删除分类小按钮
+                    if isDeleteMode && category.isCustom {
+                        Button(action: {
+                            onDeleteCategory(category)
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.red)
+                                .background(Color(.systemBackground).opacity(0.9))
+                                .clipShape(Circle())
+                                .contentShape(Circle())
+                                .compositingGroup()
+                        }
+                        .padding(.top, 6)
+                        .padding(.trailing, 6)
+                        .zIndex(1)
+                        .transition(
+                            .asymmetric(
+                                insertion: .movingParts.blinds(slatWidth: 12, style: .venetian, isStaggered: true),
+                                removal: .movingParts.iris(origin: .topTrailing, blurRadius: 1)
+                                    .combined(with: .opacity)
+                            )
+                        )
+                        .animation(.movingParts.easeInExponential(duration: 0.35), value: isDeleteMode)
+                    }
+                }
+            }
+
+            // 填充占位按钮，始终保证2行8个位置
+            let placeholderCount = max(0, 8 - categories.count)
+            ForEach(0..<placeholderCount, id: \.self) { _ in
+                PlaceholderCategoryButton(onAddCategory: onAddCategory)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - Placeholder Category Button
+struct PlaceholderCategoryButton: View {
+    let onAddCategory: () -> Void
+
+    var body: some View {
+        Button(action: onAddCategory) {
+            VStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(.gray.opacity(0.6))
+            }
+            .frame(height: 60)
+            .frame(maxWidth: .infinity)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.gray.opacity(0.4), style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

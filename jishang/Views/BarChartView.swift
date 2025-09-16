@@ -345,7 +345,7 @@ struct BarChartPageView: View {
     let calendar: Calendar
     
     private func formatDateLabel(_ date: Date) -> String {
-        DateFormatter.monthDay.string(from: date)
+        DateFormatter.onlyDay.string(from: date)
     }
     
     var body: some View {

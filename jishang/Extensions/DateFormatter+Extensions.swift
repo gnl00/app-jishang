@@ -18,6 +18,13 @@ extension DateFormatter {
         return formatter
     }()
     
+    /// 格式：d
+    static let onlyDay: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter
+    }()
+    
     /// 格式：M/d (例：9/12)
     static let monthDay: DateFormatter = {
         let formatter = DateFormatter()
