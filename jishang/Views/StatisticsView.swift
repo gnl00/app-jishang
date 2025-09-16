@@ -485,13 +485,16 @@ struct MonthlyTrendRow: View {
 // MARK: - Net Worth Trend View - 简化版
 struct NetWorthTrendView: View {
     @ObservedObject var store: TransactionStore
+    @State private var isFlipped = false
+    @State private var newGoalText = ""
+    @State private var showQuickOptions = false
 
     private var currentNetWorth: Double {
         store.balance
     }
 
     private var targetAmount: Double {
-        40000
+        store.savingsGoal
     }
 
     private var progressPercentage: Double {
@@ -516,13 +519,53 @@ struct NetWorthTrendView: View {
     }
 
     var body: some View {
+        ZStack {
+            // 正面 - 目标进度显示
+            if !isFlipped {
+                goalProgressCard
+                    .rotation3DEffect(
+                        .degrees(isFlipped ? 180 : 0),
+                        axis: (x: 0, y: 1, z: 0)
+                    )
+            }
+
+            // 背面 - 编辑界面
+            if isFlipped {
+                goalEditCard
+                    .rotation3DEffect(
+                        .degrees(isFlipped ? 0 : -180),
+                        axis: (x: 0, y: 1, z: 0)
+                    )
+            }
+        }
+        .onTapGesture(count: 2) {
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+                isFlipped.toggle()
+                if isFlipped {
+                    newGoalText = String(format: "%.0f", targetAmount)
+                }
+            }
+            // 触觉反馈
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+        }
+        .padding(.horizontal, 20)
+    }
+
+    // MARK: - 正面卡片 (目标进度)
+    private var goalProgressCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header - 统一样式
+            // Header - 简洁设计
             HStack {
                 Text("🎯 目标进度")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
+
+                // 轻微提示
+                Text("双击编辑")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary.opacity(0.6))
             }
 
             VStack(spacing: 12) {
@@ -593,9 +636,106 @@ struct NetWorthTrendView: View {
                         .stroke(Color(.systemGray6), lineWidth: 1)
                 )
         )
+    }
+
+    // MARK: - 背面卡片 (编辑界面)
+    private var goalEditCard: some View {
+        VStack(spacing: 20) {
+            // Header
+            HStack {
+                Text("💰 设置目标")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+                Spacer()
+
+                Button("完成") {
+                    saveGoal()
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.blue)
+            }
+
+            VStack(spacing: 16) {
+                // 当前目标显示
+                Text("当前: \(targetAmount.currencyFormattedInt)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                // 金额输入框
+                HStack {
+                    Text("¥")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(.blue)
+
+                    TextField("输入目标金额", text: $newGoalText)
+                        .keyboardType(.numberPad)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.center)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color(.systemGray6).opacity(0.5))
+                        )
+                        .padding(.vertical, 8)
+                }
+
+                // 快速选择
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach([10000, 30000, 50000, 100000, 200000], id: \.self) { amount in
+                            Button(action: {
+                                newGoalText = String(format: "%.0f", amount)
+                                // 轻微触觉反馈
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                impactFeedback.impactOccurred()
+                            }) {
+                                Text(amount.currencyFormattedShort)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(newGoalText == String(format: "%.0f", amount) ? .white : .blue)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(newGoalText == String(format: "%.0f", amount) ? .blue : .blue.opacity(0.1))
+                                    )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+        }
         .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color(.systemGray6), lineWidth: 1)
+                )
+        )
+        .onAppear {
+            newGoalText = String(format: "%.0f", targetAmount)
+        }
+    }
+
+    // MARK: - 保存目标
+    private func saveGoal() {
+        if let amount = Double(newGoalText), amount > 0 {
+            store.updateSavingsGoal(amount)
+            // 成功触觉反馈
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+        }
+
+        // 翻转回正面
+        withAnimation(.spring(response: 0.8, dampingFraction: 0.8)) {
+            isFlipped = false
+        }
     }
 }
+
 
 
 // MARK: - Monthly Ranking View

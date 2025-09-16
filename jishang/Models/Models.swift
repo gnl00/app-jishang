@@ -252,9 +252,11 @@ enum FilterType: Equatable {
 class TransactionStore: ObservableObject {
     @Published var transactions: [Transaction] = []
     @Published var customCategories: [Category] = []
-    
+    @Published var savingsGoal: Double = 50000
+
     private let transactionsFileName = "transactions.json"
     private let categoriesFileName = "custom_categories.json"
+    private let savingsGoalKey = "savings_goal"
     
     var allCategories: [Category] {
         return Category.predefinedCategories + customCategories
@@ -287,11 +289,21 @@ class TransactionStore: ObservableObject {
     private func loadPersistedData() {
         loadTransactions()
         loadCustomCategories()
-        
+        loadSavingsGoal()
+
         // 如果没有持久化数据，加载示例数据
         if transactions.isEmpty {
             loadSampleData()
             saveData() // 保存示例数据
+        }
+    }
+
+    private func loadSavingsGoal() {
+        if let savedGoal = UserDefaults.standard.object(forKey: savingsGoalKey) as? Double {
+            savingsGoal = savedGoal
+            print("✅ 成功加载储蓄目标: \(savingsGoal.currencyFormattedInt)")
+        } else {
+            print("📝 使用默认储蓄目标: \(savingsGoal.currencyFormattedInt)")
         }
     }
     
@@ -340,6 +352,12 @@ class TransactionStore: ObservableObject {
     private func saveData() {
         saveTransactions()
         saveCustomCategories()
+        saveSavingsGoal()
+    }
+
+    private func saveSavingsGoal() {
+        UserDefaults.standard.set(savingsGoal, forKey: savingsGoalKey)
+        print("💾 储蓄目标已保存: \(savingsGoal.currencyFormattedInt)")
     }
 
     // 将旧版本中使用的随机ID预置分类，映射为当前版本的稳定ID对象（按名称匹配）
@@ -451,7 +469,12 @@ class TransactionStore: ObservableObject {
         transactions.append(transaction)
         saveTransactions()
     }
-    
+
+    func updateSavingsGoal(_ newGoal: Double) {
+        savingsGoal = newGoal
+        saveSavingsGoal()
+    }
+
     func updateTransaction(_ transaction: Transaction) {
         if let index = transactions.firstIndex(where: { $0.id == transaction.id }) {
             transactions[index] = transaction
