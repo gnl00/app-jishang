@@ -13,6 +13,9 @@ struct HomeView: View {
     @State private var presentedTransactionType: TransactionType?
     @State private var showVoiceInput = false
     @State private var voiceInputType: TransactionType = .expense
+
+    // MonthlySummaryView 折叠状态管理
+    @State private var isCollapsed: Bool = false
     
     // 列表数据下放到 TransactionListView 内部计算（折叠状态已内聚到子视图）
     
@@ -37,11 +40,37 @@ struct HomeView: View {
                 }
                 .padding(.top)
                 .padding(.bottom, 6)
-                
-                // Transaction list with internal scroll-aware collapse handling
+
+                // MonthlySummaryView 独立布局（不在 ScrollView 内）
+                if !isCollapsed {
+                    MonthlySummaryView(store: transactionStore)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
+                        .transition(
+                            .asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .scale(scale: 0.95).combined(with: .opacity)
+                            )
+                        )
+                }
+
+                // CollapsedSummaryView 独立布局（不在 ScrollView 内）
+                if isCollapsed {
+                    CollapsedSummaryView {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isCollapsed = false
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Transaction list - 移除内部的折叠逻辑
                 TransactionListView(
                     store: transactionStore,
-                    selectedFilter: $selectedFilter
+                    selectedFilter: $selectedFilter,
+                    isCollapsed: $isCollapsed
                 )
                 .background(Color(.systemGroupedBackground))
             }
@@ -125,13 +154,6 @@ struct CollapsedSummaryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 占位元素 - 灰色分隔条
-            HStack {
-                Spacer()
-            }
-            .padding(.vertical, 2)
-            .background(Color(.systemGray6))
-
             // 月度总览展开按钮
             Button(action: {
                 // Haptic反馈

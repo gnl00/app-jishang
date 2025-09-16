@@ -284,9 +284,12 @@ struct CategoryFilterView: View {
     }
 
     private func handleMainTypeSelection(_ mainType: MainFilterType) {
+        print("[FILTER-BUTTON-CLICK] MainType button clicked: '\(mainType.rawValue)' (from '\(selectedMainType.rawValue)' to '\(mainType.rawValue)')")
+
         // 如果已选中相同类型，则取消选中回到全部状态
         if selectedMainType == mainType && mainType != .all {
             selectedMainType = .all
+            print("[FILTER-BUTTON-CLICK] Same MainType clicked - resetting to 'all'")
             // 回到全部状态，但保持当前的日期筛选
             updateFilterForDateChange()
             withAnimation(.easeInOut(duration: 0.3)) {
@@ -294,14 +297,15 @@ struct CategoryFilterView: View {
             }
             return
         }
-        
+
         selectedMainType = mainType
-        
+
         // 根据主类型和当前日期筛选来更新过滤器
         updateFilterForDateChange()
-        
+
         // 如果选择收入或支出，且有子类别，自动展开
         if canExpand && !isExpanded {
+            print("[FILTER-BUTTON-CLICK] Auto-expanding sub-filters for '\(mainType.rawValue)'")
             withAnimation(.easeInOut(duration: 0.3)) {
                 isExpanded = true
             }

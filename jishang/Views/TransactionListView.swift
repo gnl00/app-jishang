@@ -11,17 +11,26 @@ import Pow
 struct TransactionListView: View {
     @ObservedObject var store: TransactionStore
     @Binding var selectedFilter: FilterType
+    @Binding var isCollapsed: Bool
 
     @State private var editingTransaction: Transaction?
     @State private var showEditView = false
     @State private var deletingTransactionId: UUID?
-    // Internal collapse state
-    @State private var isCollapsed: Bool = false
     @State private var lastLoggedBucket: Int = Int.min
 
-    // CategoryFilterView sticky state tracking
-    @State private var categoryFilterSticky: Bool = false
-    @State private var isFilterChanging: Bool = false
+    // 滚动方向检测
+    @State private var lastScrollOffset: CGFloat = 0
+    @State private var scrollDirection: ScrollDirection = .none
+    @State private var isStateChanging: Bool = false  // 状态变化保护期
+    @State private var lastStateChangeTime: Date = Date()
+    @State private var isFilterChanging: Bool = false  // filter变化保护期
+    @State private var lastFilterChangeTime: Date = Date()
+
+    enum ScrollDirection {
+        case up      // 上滑
+        case down    // 下拉
+        case none    // 无滚动
+    }
     
 
     // 移除 filteredTransactions 计算属性，过滤逻辑下沉到子组件
@@ -30,58 +39,7 @@ struct TransactionListView: View {
         let _ = print("[DEBUG] TransactionListView body render - isCollapsed: \(isCollapsed)")
         ScrollViewReader { scrollProxy in
             ScrollView {
-                LazyVStack(spacing: 4, pinnedViews: [.sectionHeaders]) {
-                    // Top offset reporter for continuous scroll logging (debug)
-                    Color.clear
-                        .frame(height: 0)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: ScrollOffsetKey.self,
-                                    value: proxy.frame(in: .named("txScroll")).minY
-                                )
-                            }
-                        )
-                    // Expanded: show monthly summary at top
-                    if !isCollapsed {
-                        MonthlySummaryView(store: store)
-                            .id("monthlySummary")
-                            .padding(.top, 4)
-                            .applyScrollFadeScale()
-                            .transition(
-                                .asymmetric(
-                                    insertion: .scale.combined(with: .opacity),
-                                    removal: .scale(scale: 0.95).combined(with: .opacity)
-                                )
-                            )
-                            .onAppear {
-                                print("[DEBUG] MonthlySummaryView appeared - isCollapsed: \(isCollapsed)")
-                            }
-                    }
-
-                    // CategoryFilter 哨兵 - 用于检测 CategoryFilterView 的位置
-                    Color.clear
-                        .frame(height: 1)
-                        .id("categoryFilterSentinel")
-                        .background(
-                            GeometryReader { proxy in
-                                let frame = proxy.frame(in: .named("txScroll"))
-                                let isSticky = frame.minY <= 0
-                                Color.clear
-                                    .preference(
-                                        key: CategoryFilterStickyPreferenceKey.self,
-                                        value: ["categoryFilter": isSticky]
-                                    )
-                                    .onChange(of: frame.minY) { minY in
-                                        // 添加防抖和过滤机制，减少不必要的更新
-                                        let currentIsSticky = minY <= 0
-                                        if !isFilterChanging {
-                                            print("[SENTINEL-DEBUG] Sentinel minY: \(String(format: "%.2f", minY)), isSticky: \(currentIsSticky)")
-                                        }
-                                    }
-                            }
-                        )
-
+                LazyVStack(spacing: 8, pinnedViews: [.sectionHeaders]) {
                     Section {
                         // Transactions - 使用独立组件处理过滤和渲染
                         FilteredTransactionsList(
@@ -102,25 +60,12 @@ struct TransactionListView: View {
                             deletingTransactionId: deletingTransactionId
                         )
                     } header: {
-                        VStack(spacing: 0) {
-                            if isCollapsed {
-                                CollapsedSummaryView {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        isCollapsed = false
-                                    }
-                                }
-                                .transition(.opacity.combined(with: .move(edge: .top)))
-                                .onAppear {
-                                    print("[DEBUG] CollapsedSummaryView appeared - isCollapsed: \(isCollapsed)")
-                                }
-                            }
-
-                            CategoryFilterView(
-                                store: store,
-                                selectedFilter: $selectedFilter
-                            )
-                            .padding(.bottom, 4)
-                        }
+                        CategoryFilterView(
+                            store: store,
+                            selectedFilter: $selectedFilter
+                        )
+                        .padding(.top, 8)      // 顶部内边距，避免与状态栏重叠
+                        .padding(.bottom, 12)  // 增加底部内边距，为下方内容留出空间
                         .background(
                             Color(.systemGroupedBackground)
                                 .ignoresSafeArea()
@@ -132,43 +77,88 @@ struct TransactionListView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
             }
-            .coordinateSpace(name: "txScroll")
             .background(Color(.systemGroupedBackground))
-            .onPreferenceChange(CategoryFilterStickyPreferenceKey.self) { preferences in
-                // 在过滤器变化期间忽略 sticky 状态变化
-                if isFilterChanging {
-                    print("[STICKY-DEBUG] Ignoring sticky state change during filter transition")
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                // 使用 contentOffset.y 作为滚动偏移值
+                return geometry.contentOffset.y
+            } action: { oldValue, newValue in
+                let currentTime = Date()
+
+                // 在状态变化或filter变化保护期内忽略滚动检测
+                if isStateChanging || currentTime.timeIntervalSince(lastStateChangeTime) < 0.5 {
+                    print("[SCROLL-DEBUG] Ignoring scroll during state change protection period")
                     return
                 }
 
-                let _ = print("onPreferenceChange on pin state change")
-                if let isSticky = preferences["categoryFilter"] {
-                    if categoryFilterSticky != isSticky {
-                        categoryFilterSticky = isSticky
-                        print("[STICKY-DEBUG] CategoryFilterView pinned state changed: \(isSticky ? "PINNED" : "UNPINNED")")
+                if isFilterChanging || currentTime.timeIntervalSince(lastFilterChangeTime) < 0.8 {
+                    print("[SCROLL-DEBUG] Ignoring scroll during filter change protection period")
+                    return
+                }
 
-                        // 这里可以添加对 pinned 状态变化的响应逻辑
-                        onCategoryFilterViewSticky(isSticky)
+                // 计算滚动方向
+                let offsetDifference = newValue - oldValue
+                let threshold: CGFloat = 10.0 // 增加阈值，减少敏感度
+
+                // 更新滚动方向
+                if abs(offsetDifference) > threshold {
+                    let newDirection: ScrollDirection = offsetDifference > 0 ? .up : .down
+
+                    if newDirection != scrollDirection {
+                        scrollDirection = newDirection
+
+                        // 根据滚动方向控制 isCollapsed 状态，但只在状态真正需要改变时
+                        let shouldChangeState = (scrollDirection == .up && !isCollapsed) ||
+                                               (scrollDirection == .down && isCollapsed)
+
+                        if shouldChangeState {
+                            // 设置状态变化保护期
+                            isStateChanging = true
+                            lastStateChangeTime = currentTime
+
+                            switch scrollDirection {
+                            case .up:
+                                // 上滑时折叠
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    isCollapsed = true
+                                }
+                                print("[SCROLL-DIRECTION] Up scroll detected -> Collapsing MonthlySummaryView")
+                            case .down:
+                                // 下拉时展开
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    isCollapsed = false
+                                }
+                                print("[SCROLL-DIRECTION] Down scroll detected -> Expanding MonthlySummaryView")
+                            case .none:
+                                break
+                            }
+
+                            // 延迟重置保护期
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                isStateChanging = false
+                            }
+                        }
                     }
                 }
-            }
-            .onPreferenceChange(ScrollOffsetKey.self) { offset in
+
                 // 简化的滚动偏移日志记录
-                let bucket = Int((offset / 20).rounded())
+                let bucket = Int((newValue / 20).rounded())
                 if bucket != lastLoggedBucket {
                     lastLoggedBucket = bucket
-                    print("[SCROLL-DEBUG] scrollOffset:\(String(format: "%.1f", offset)) isCollapsed:\(isCollapsed)")
+                    print("[SCROLL-DEBUG] scrollOffset:\(String(format: "%.1f", newValue)) direction:\(scrollDirection) isCollapsed:\(isCollapsed)")
                 }
             }
-            .onChange(of: selectedFilter) { newFilter in
-                print("[FILTER-DEBUG] Filter changed to: \(newFilter) - categoryFilterSticky: \(categoryFilterSticky)")
+        }
+        .onChange(of: selectedFilter) { oldFilter, newFilter in
+            print("[FILTER-CHANGE] Filter changed from '\(oldFilter.displayName)' to '\(newFilter.displayName)'")
 
-                // 现在过滤器变化只影响 FilteredTransactionsList，不会导致整个视图重建
-                // 因此不需要复杂的防滚动逻辑，只需要简单的防抖即可
-                isFilterChanging = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isFilterChanging = false
-                }
+            // 设置filter变化保护期
+            isFilterChanging = true
+            lastFilterChangeTime = Date()
+
+            // 延迟重置保护期，给内容变化足够的时间
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                isFilterChanging = false
+                print("[FILTER-CHANGE] Filter change protection period ended")
             }
         }
         .sheet(item: $editingTransaction) { transaction in
@@ -181,30 +171,6 @@ struct TransactionListView: View {
         }
     }
 
-    // MARK: - CategoryFilterView Sticky Handler
-    private func onCategoryFilterViewSticky(_ isSticky: Bool) {
-        // 在过滤器变化期间忽略 sticky 状态变化
-        if isFilterChanging {
-            print("[STICKY-DEBUG] Ignoring sticky state change during filter transition - isSticky: \(isSticky)")
-            return
-        }
-
-        print("[STICKY-DEBUG] onCategoryFilterViewSticky called with isSticky: \(isSticky)")
-
-        // 在这里可以根据 CategoryFilterView 的 pinned 状态来控制 MonthlySummaryView 的显示/隐藏
-        // 例如：当 CategoryFilterView 被 pinned 时，折叠 MonthlySummaryView
-        if isSticky && !isCollapsed {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                isCollapsed = true
-            }
-            print("[STICKY-DEBUG] CategoryFilterView pinned -> Collapsing MonthlySummaryView")
-        } else if !isSticky && isCollapsed {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                isCollapsed = false
-            }
-            print("[STICKY-DEBUG] CategoryFilterView unpinned -> Expanding MonthlySummaryView")
-        }
-    }
 
 }
 
@@ -396,9 +362,19 @@ struct FilteredTransactionsList: View {
                         }
                     }
             }
+
+            // 添加一个最小高度的占位符，确保内容变化时高度相对稳定
+            if filteredTransactions.count < 3 {
+                ForEach(0..<(3 - filteredTransactions.count), id: \.self) { _ in
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(height: 80) // 大约一个交易行的高度
+                }
+            }
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 1)
+        .frame(minHeight: 240) // 确保至少有 3 行交易的高度
     }
 }
 
@@ -439,23 +415,8 @@ struct TriangleCornerBottomRight: View {
 }
 
 // MARK: - Utilities
-private struct ScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = .zero
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+// ScrollOffsetKey 已移除，使用 iOS 18 的 onScrollGeometryChange 替代
 
-// MARK: - 自定义 PreferenceKey 用于传输 CategoryFilterView 的 Sticky 状态
-private struct CategoryFilterStickyPreferenceKey: PreferenceKey {
-    typealias Value = [String: Bool]
-
-    static var defaultValue: Value = [:]
-
-    static func reduce(value: inout Value, nextValue: () -> Value) {
-        value.merge(nextValue()) { _, new in new }
-    }
-}
 
 #if canImport(SwiftUI)
 private extension View {
@@ -488,6 +449,7 @@ private extension View {
     let store = TransactionStore()
     return TransactionListView(
         store: store,
-        selectedFilter: .constant(.all)
+        selectedFilter: .constant(.all),
+        isCollapsed: .constant(false)
     )
 }
