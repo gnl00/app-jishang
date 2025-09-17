@@ -119,7 +119,7 @@ struct ScrollableBarChartView: View {
             SwiftChartsBar()
                 .frame(height: 200)
             HStack {
-                Text(viewMode == .week ? "横向滚动查看上/下周（最多前四周）" : "展示当月从 1 日至今天")
+                Text(viewMode == .week ? "左右滑动查看前/后周数据" : "展示当月数据")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }

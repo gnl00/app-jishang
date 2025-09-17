@@ -87,7 +87,7 @@ struct AddTransactionView: View {
     private var fixedTabViewHeight: CGFloat {
         return CGFloat(2 * 75) // 2行，每行75pt（60pt分类高度 + 15pt间距）
     }
-    
+
     private var isValidInput: Bool {
         guard let amountValue = Double(amount), amountValue > 0,
               let _ = selectedCategory else {
@@ -186,13 +186,6 @@ struct AddTransactionView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondary)
                 Spacer()
-
-                // 页面指示器文本（只有多页时显示）
-                if categoryPages.count > 1 {
-                    Text("第 1 页，共 \(categoryPages.count) 页")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
             }
             .padding(.horizontal, 20)
 
@@ -224,6 +217,10 @@ struct AddTransactionView: View {
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: categoryPages.count > 1 ? .always : .never))
             .frame(height: fixedTabViewHeight) // 固定高度：始终2行
             .background(Color(.systemBackground))
+            .onAppear {
+                // 设置页面指示器颜色（淡蓝色主题）
+                setupPageControlAppearance()
+            }
 
             // 固定操作按钮区域（独立于分页）
             operationButtonsSection
@@ -504,6 +501,22 @@ struct AddTransactionView: View {
         }
         
         editingTransaction = nil
+    }
+
+    // MARK: - Page Control Appearance Setup
+    private func setupPageControlAppearance() {
+        // 设置页面指示器的外观，使用淡蓝色主题
+        let pageControl = UIPageControl.appearance()
+
+        // 设置当前页面指示器颜色（选中状态）- 使用淡蓝色
+        pageControl.currentPageIndicatorTintColor = UIColor.blue.withAlphaComponent(0.6)
+
+        // 设置非当前页面指示器颜色（未选中状态）- 使用浅灰色
+        pageControl.pageIndicatorTintColor = UIColor.systemGray4
+
+        // 移除背景相关设置，背景由overlay处理
+        pageControl.backgroundColor = UIColor.clear
+        pageControl.preferredIndicatorImage = nil
     }
 }
 
