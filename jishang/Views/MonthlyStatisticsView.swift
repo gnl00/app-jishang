@@ -539,12 +539,13 @@ struct ConsumptionTrendView: View {
             // 图表区域 - 缩小高度
             ScrollableBarChartView(store: store, selectedMonth: selectedMonth, selectedDate: $selectedDate, viewMode: viewMode)
                 .frame(height: 200)
-            
+
             // 点击提示
-            Text("💡 点击柱状图查看详情")
+            Text("💡 长按柱状图查看详情")
                 .font(.system(size: 10))
                 .foregroundColor(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 2)
         }
         .padding(16)
         .background(
