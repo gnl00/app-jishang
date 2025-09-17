@@ -33,6 +33,8 @@ struct ScrollableBarChartView: View {
     @State private var xScrollPosition: Date = Date()
     // 周视图分页（TabView）当前页索引：0=最早，maxWeeksBack=最新
     @State private var weekPageIndex: Int = 0
+    // 防抖标志：避免双向状态绑定循环
+    @State private var isUpdatingSelection: Bool = false
     private let maxWeeksBack: Int = 4 // 最多查看前四周
     private var calendar: Calendar { Calendar.current }
 
@@ -124,8 +126,9 @@ struct ScrollableBarChartView: View {
             .padding(.horizontal, 4)
         }
         .onAppear {
+            isUpdatingSelection = true
             if let sel = selectedDate { xSelection = sel } else { xSelection = calendar.startOfDay(for: Date()) }
-            // 初始定位：周视图对齐到“周起点”，月视图到“该月末/今天”
+            // 初始定位：周视图对齐到"周起点"，月视图到"该月末/今天"
             if viewMode == .week {
                 let anchor = selectedDate ?? weekOverallRange.end
                 xScrollPosition = calendar.startOfWeek(for: anchor)
@@ -134,8 +137,12 @@ struct ScrollableBarChartView: View {
             } else {
                 xScrollPosition = monthOverallRange.end
             }
+            DispatchQueue.main.async {
+                isUpdatingSelection = false
+            }
         }
         .onChange(of: viewMode) { _, _ in
+            isUpdatingSelection = true
             xSelection = selectedDate ?? calendar.startOfDay(for: Date())
             if viewMode == .week {
                 let anchor = selectedDate ?? weekOverallRange.end
@@ -143,6 +150,9 @@ struct ScrollableBarChartView: View {
                 weekPageIndex = initialWeekPageIndex(anchor: anchor)
             } else {
                 xScrollPosition = monthOverallRange.end
+            }
+            DispatchQueue.main.async {
+                isUpdatingSelection = false
             }
         }
         .onChange(of: selectedMonth) { _, _ in
@@ -270,12 +280,24 @@ private extension ScrollableBarChartView {
     private func addSelectionHandlers<V: View>(_ chart: V) -> some View {
         chart
             .onChange(of: xSelection) { _, newValue in
+                guard !isUpdatingSelection else { return }
                 if let date = newValue {
+                    isUpdatingSelection = true
                     selectedDate = calendar.startOfDay(for: date)
+                    // 延迟重置标志，避免同帧内的反向更新
+                    DispatchQueue.main.async {
+                        isUpdatingSelection = false
+                    }
                 }
             }
             .onChange(of: selectedDate) { _, newValue in
+                guard !isUpdatingSelection else { return }
+                isUpdatingSelection = true
                 xSelection = newValue
+                // 延迟重置标志，避免同帧内的反向更新
+                DispatchQueue.main.async {
+                    isUpdatingSelection = false
+                }
             }
     }
 
@@ -372,7 +394,7 @@ private extension ScrollableBarChartView {
         RuleMark(x: .value("选中", date))
             .lineStyle(lineStyle)
             .foregroundStyle(foregroundColor)
-            .annotation(position: .top) {
+            .annotation(position: .automatic) {
                 ChartTooltipView(date: date, expense: exp, income: inc)
             }
     }
