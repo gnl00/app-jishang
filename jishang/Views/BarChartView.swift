@@ -5,16 +5,13 @@
 //  Created by Gnl on 2025/9/12.
 //  
 //  Contains:
-//  - ScrollableBarChartView: Main scrollable bar chart component
-//  - BarChartPageView: Individual page view for chart pagination
-//  - BarItemView: Individual bar components
-//  - YAxisView: Y-axis labels and ticks
-//  - YAxisGridLines: Grid lines for the chart
-//  - Bar-related helper components and views
+//  - ScrollableBarChartView: Swift Charts-based bar chart component supporting
+//    week/month modes, right-swipe to previous weeks, and tap-to-select.
 //
 
 import SwiftUI
 import Foundation
+import Charts
 
 // MARK: - Scrollable Bar Chart View
 struct ScrollableBarChartView: View {
@@ -30,13 +27,16 @@ struct ScrollableBarChartView: View {
         self.viewMode = viewMode
     }
     
-    // UI-only state: current page (7-day window). Reset on month change via .id(monthDate)
-    @State private var currentPage: Int = 0 // 默认指向最新页；向右滑动查看更早
-    private let daysPerPage: Int = 7
-    private let barSpacing: CGFloat = 8
-    
+    // iOS17 的 X 轴选择绑定（与 selectedDate 同步）
+    @State private var xSelection: Date? = nil
+    // iOS17 的横向滚动位置（必须为非可选类型，单位与 X 轴 Plottable 一致，这里是 Date）
+    @State private var xScrollPosition: Date = Date()
+    // 周滚动吸附：防抖定时器与时间戳（用于判断滚动结束）
+    @State private var lastScrollEventAt: Date = .distantPast
+    @State private var snapWorkItem: DispatchWorkItem?
+    private let maxWeeksBack: Int = 4 // 最多查看前四周
     private var calendar: Calendar { Calendar.current }
-    
+
     struct DayDatum: Identifiable {
         let id = UUID()
         let day: Int
@@ -45,557 +45,319 @@ struct ScrollableBarChartView: View {
         let date: Date
     }
     
-    private var chartData: [DayDatum] {
-        // 根据视图模式和选择的月份返回不同的数据
-        if let selectedMonth = selectedMonth {
-            switch viewMode {
-            case .week:
-                return weeklyChartData(for: selectedMonth)
-            case .month:
-                return monthlyChartData(for: selectedMonth)
-            }
-        } else {
-            return defaultChartData()
+    // MARK: Data Builders
+    // 将给定时间范围内的交易聚合为连续的日序列（无数据的日期填 0）
+    private func buildDailySeries(from startDate: Date, to endDate: Date) -> [DayDatum] {
+        let start = calendar.startOfDay(for: startDate)
+        let end = calendar.startOfDay(for: endDate)
+
+        // 过滤时间范围内的交易
+        let rangeTx = store.transactions.filter { t in
+            let d = calendar.startOfDay(for: t.date)
+            return d >= start && d <= end
         }
-    }
-    
-    private func weeklyChartData(for month: Date) -> [DayDatum] {
-        // 周视图：7天分页，支持滑动查看更早数据（保持原有逻辑）
-        let calendar = Calendar.current
-        let startOfMonth = calendar.startOfMonth(for: month)
-        let today = calendar.startOfDay(for: Date())
-        let isCurrentMonth = calendar.isDate(month, equalTo: Date(), toGranularity: .month)
-        
-        // 计算结束日期：如果是当前月份，则到今天为止；否则到月末
-        let endDate: Date
-        if isCurrentMonth {
-            endDate = today
-        } else {
-            // 获取该月的最后一天
-            let range = calendar.range(of: .day, in: .month, for: month) ?? 1..<32
-            let lastDay = range.count
-            endDate = calendar.date(byAdding: .day, value: lastDay - 1, to: startOfMonth) ?? startOfMonth
-        }
-        
-        // 过滤该月份的交易
-        let monthTransactions = store.transactions.filter { transaction in
-            calendar.isDate(transaction.date, equalTo: month, toGranularity: .month)
-        }
-        
-        let expenseTx = monthTransactions.filter { $0.type == .expense }
-        let incomeTx = monthTransactions.filter { $0.type == .income }
-        
+        let expenseTx = rangeTx.filter { $0.type == .expense }
+        let incomeTx = rangeTx.filter { $0.type == .income }
+
         // 按天聚合
         var expenseTotals: [Date: Double] = [:]
         var incomeTotals: [Date: Double] = [:]
-        
-        for t in expenseTx {
-            let key = calendar.startOfDay(for: t.date)
-            expenseTotals[key, default: 0] += t.amount
-        }
-        for t in incomeTx {
-            let key = calendar.startOfDay(for: t.date)
-            incomeTotals[key, default: 0] += t.amount
-        }
-        
-        // 生成从月初到结束日期的每天数据
+        for t in expenseTx { expenseTotals[calendar.startOfDay(for: t.date), default: 0] += t.amount }
+        for t in incomeTx  { incomeTotals [calendar.startOfDay(for: t.date), default: 0] += t.amount }
+
+        // 生成序列
         var data: [DayDatum] = []
-        var cursor = startOfMonth
-        var day = 1
-        
-        while cursor <= endDate {
-            let expense = expenseTotals[cursor] ?? 0
-            let income = incomeTotals[cursor] ?? 0
-            data.append(DayDatum(day: day, income: income, expense: expense, date: cursor))
-            
-            day += 1
-            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? endDate
-        }
-        
-        return data
-    }
-    
-    private func monthlyChartData(for month: Date) -> [DayDatum] {
-        // 月视图：展示当月所有天数的数据，从月初到今天/月末，不分页
-        let calendar = Calendar.current
-        let startOfMonth = calendar.startOfMonth(for: month)
-        let today = calendar.startOfDay(for: Date())
-        let isCurrentMonth = calendar.isDate(month, equalTo: Date(), toGranularity: .month)
-        
-        // 计算结束日期：如果是当前月份，则到今天为止；否则到月末
-        let endDate: Date
-        if isCurrentMonth {
-            endDate = today
-        } else {
-            // 获取该月的最后一天
-            let range = calendar.range(of: .day, in: .month, for: month) ?? 1..<32
-            let lastDay = range.count
-            endDate = calendar.date(byAdding: .day, value: lastDay - 1, to: startOfMonth) ?? startOfMonth
-        }
-        
-        // 过滤该月份的交易
-        let monthTransactions = store.transactions.filter { transaction in
-            calendar.isDate(transaction.date, equalTo: month, toGranularity: .month)
-        }
-        
-        let expenseTx = monthTransactions.filter { $0.type == .expense }
-        let incomeTx = monthTransactions.filter { $0.type == .income }
-        
-        // 按天聚合
-        var expenseTotals: [Date: Double] = [:]
-        var incomeTotals: [Date: Double] = [:]
-        
-        for t in expenseTx {
-            let key = calendar.startOfDay(for: t.date)
-            expenseTotals[key, default: 0] += t.amount
-        }
-        for t in incomeTx {
-            let key = calendar.startOfDay(for: t.date)
-            incomeTotals[key, default: 0] += t.amount
-        }
-        
-        // 生成从月初到结束日期的每天数据
-        var data: [DayDatum] = []
-        var cursor = startOfMonth
-        var day = 1
-        
-        while cursor <= endDate {
-            let expense = expenseTotals[cursor] ?? 0
-            let income = incomeTotals[cursor] ?? 0
-            data.append(DayDatum(day: day, income: income, expense: expense, date: cursor))
-            
-            day += 1
-            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? endDate
-        }
-        
-        return data
-    }
-    
-    private func defaultChartData() -> [DayDatum] {
-        // Build a continuous daily series from at least (today-6) to today,
-        // and extend earlier if there are older expenses to support paging right.
-        let today = calendar.startOfDay(for: Date())
-        let expenseTx = store.transactions.filter { $0.type == .expense }
-        let incomeTx = store.transactions.filter { $0.type == .income }
-        let earliestExpense = expenseTx.map { calendar.startOfDay(for: $0.date) }.min() ?? today
-        let sevenDaysAgo = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-        let earliest = min(earliestExpense, sevenDaysAgo)
-        
-        // Aggregate expenses and incomes by day
-        var expenseTotals: [Date: Double] = [:]
-        var incomeTotals: [Date: Double] = [:]
-        for t in expenseTx {
-            let key = calendar.startOfDay(for: t.date)
-            expenseTotals[key, default: 0] += t.amount
-        }
-        for t in incomeTx {
-            let key = calendar.startOfDay(for: t.date)
-            incomeTotals[key, default: 0] += t.amount
-        }
-        
-        // Build array
-        var data: [DayDatum] = []
-        var cursor = earliest
+        var cursor = start
         var idx = 1
-        while cursor <= today {
-            let exp = expenseTotals[cursor] ?? 0
-            let inc = incomeTotals[cursor] ?? 0
-            let displayDate = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: cursor) ?? cursor
-            data.append(DayDatum(day: idx, income: inc, expense: exp, date: displayDate))
+        while cursor <= end {
+            let expense = expenseTotals[cursor] ?? 0
+            let income  = incomeTotals[cursor]  ?? 0
+            data.append(DayDatum(day: idx, income: income, expense: expense, date: cursor))
             idx += 1
-            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? today
+            cursor = calendar.date(byAdding: .day, value: 1, to: cursor) ?? end
         }
         return data
     }
-    
-    private var maxValue: Double {
-        let maxExpense = chartData.map { $0.expense }.max() ?? 0
-        let maxIncome = chartData.map { $0.income }.max() ?? 0
-        return max(max(maxExpense, maxIncome), 1)
+
+    // 月视图：当月从 1 号到今天（若非本月则到月末）。仅 1 页
+    private func monthlyPage(for month: Date) -> [DayDatum] {
+        let start = calendar.startOfMonth(for: month)
+        let today = calendar.startOfDay(for: Date())
+        let isCurrentMonth = calendar.isDate(month, equalTo: Date(), toGranularity: .month)
+        let end: Date
+        if isCurrentMonth {
+            end = today
+        } else {
+            end = calendar.endOfMonth(for: month)
+        }
+        return buildDailySeries(from: start, to: end)
+    }
+
+    // iOS17 滚动轴使用的整体域（周视图：最近 5 周）
+    private var weekOverallRange: (start: Date, end: Date) {
+        let today = calendar.startOfDay(for: Date())
+        let end = calendar.endOfWeek(for: today)
+        let start = calendar.date(byAdding: .day, value: -7 * maxWeeksBack, to: calendar.startOfWeek(for: today)) ?? end
+        return (start, end)
     }
     
-    private var pageCount: Int {
-        guard !chartData.isEmpty else { return 1 }
-        
-        // 月视图：显示所有数据，不分页
-        if viewMode == .month {
-            return 1
-        }
-        
-        // 周视图：7天分页逻辑
-        let total = chartData.count
-        
-        // 如果总数据不足7天，只需要1页
-        if total <= daysPerPage {
-            return 1
-        }
-        
-        // 由于页面间有重叠（每页推进5天），重新计算页面数
-        let stepSize = daysPerPage - 2 // 每页推进5天
-        return max(1, Int(ceil(Double(total - daysPerPage) / Double(stepSize))) + 1)
+    private var weekOverallData: [DayDatum] {
+        buildDailySeries(from: weekOverallRange.start, to: weekOverallRange.end)
     }
     
-    private func pageRange(_ page: Int) -> Range<Int> {
-        let total = chartData.count
-        
-        // 月视图：返回所有数据
-        if viewMode == .month {
-            return 0..<total
-        }
-        
-        // 周视图：7天分页逻辑
-        // 如果总数据不足7天，直接返回全部数据
-        if total <= daysPerPage {
-            return 0..<total
-        }
-        
-        // 计算每页的步长（重叠2天，实际推进5天）
-        let stepSize = daysPerPage - 2 // 每页推进5天，保持2天重叠
-        
-        // 计算当前页的结束位置（从最新数据开始算）
-        let endIndex = total - page * stepSize
-        
-        // 确保每页显示7天数据
-        let startIndex = max(0, endIndex - daysPerPage)
-        let actualEndIndex = min(total, startIndex + daysPerPage)
-        
-        return startIndex..<actualEndIndex
+    private var monthOverallRange: (start: Date, end: Date) {
+        let target = selectedMonth ?? Date()
+        let start = calendar.startOfMonth(for: target)
+        let isCurrentMonth = calendar.isDate(target, equalTo: Date(), toGranularity: .month)
+        let end = isCurrentMonth ? calendar.startOfDay(for: Date()) : calendar.endOfMonth(for: target)
+        return (start, end)
     }
-    
-    private var lastPageIndex: Int { max(0, pageCount - 1) }
     
     var body: some View {
         VStack(spacing: 12) {
-            if chartData.isEmpty {
-                Text("暂无数据")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                    .frame(height: 200)
-            } else {
-                GeometryReader { geometry in
-                    let axisWidth: CGFloat = 38
-                    let axisSpacing: CGFloat = 6
-                    let pageHeight: CGFloat = 200
-                    let chartHeight: CGFloat = 160
-                    let barsAreaWidth = max(0, geometry.size.width - axisWidth - axisSpacing)
-
-                    HStack(alignment: .bottom, spacing: axisSpacing) {
-                        // Gridlines overlay + paged bars region (left)
-                        ZStack(alignment: .bottomLeading) {
-                            YAxisGridLines(tickCount: 4)
-                                .frame(height: chartHeight)
-                                .padding(.bottom, pageHeight - chartHeight)
-                                .allowsHitTesting(false)
-
-                            TabView(selection: $currentPage) {
-                                ForEach(0..<pageCount, id: \.self) { displayIndex in
-                                    let internalPage = lastPageIndex - displayIndex
-                                    BarChartPageView(
-                                        chartData: Array(chartData[pageRange(internalPage)]),
-                                        selectedDate: $selectedDate,
-                                        maxValue: maxValue,
-                                        barSpacing: barSpacing,
-                                        calendar: calendar
-                                    )
-                                    .tag(displayIndex)
-                                }
-                            }
-                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-                            .frame(height: pageHeight)
-                        }
-                        .frame(width: barsAreaWidth, height: pageHeight, alignment: .bottom)
-
-                        // Fixed Y Axis (right) — align baseline with X-axis
-                        YAxisView(maxValue: maxValue, tickCount: 4)
-                            .frame(width: axisWidth, height: chartHeight, alignment: .bottom)
-                            .padding(.bottom, pageHeight - chartHeight)
-                    }
-                }
+            SwiftChartsBar()
                 .frame(height: 200)
-            }
-
-            // 页脚：提示与页码（可选）
+            // 页脚：提示
             HStack {
-                Text(viewMode == .week ? "向右滑动展示更早数据" : "展示当月所有数据")
+                Text(viewMode == .week ? "横向滚动查看上/下周（最多前四周）" : "展示当月从 1 日至今天")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 4)
         }
         .onAppear {
-            // 默认定位到最新页（今天往前 7 天）
-            currentPage = lastPageIndex
-        }
-        .onChange(of: store.transactions.count) { _, _ in
-            currentPage = lastPageIndex
+            if let sel = selectedDate { xSelection = sel } else { xSelection = calendar.startOfDay(for: Date()) }
+            // 初始将可见窗口靠近整体域的末端（最新一周 / 当月末）
+            xScrollPosition = (viewMode == .week) ? weekOverallRange.end : monthOverallRange.end
         }
         .onChange(of: viewMode) { _, _ in
-            // 当视图模式改变时，重置到最新页
-            currentPage = lastPageIndex
+            xSelection = selectedDate ?? calendar.startOfDay(for: Date())
+            xScrollPosition = (viewMode == .week) ? weekOverallRange.end : monthOverallRange.end
         }
-    }
-}
-
-// MARK: - BarChartPageView
-struct BarChartPageView: View {
-    let chartData: [ScrollableBarChartView.DayDatum]
-    @Binding var selectedDate: Date?
-    let maxValue: Double
-    let barSpacing: CGFloat
-    let calendar: Calendar
-    
-    private func formatDateLabel(_ date: Date) -> String {
-        DateFormatter.onlyDay.string(from: date)
-    }
-    
-    var body: some View {
-        GeometryReader { geometry in
-            let pageHeight: CGFloat = 200
-            let chartHeight: CGFloat = 160
-            let axisThickness: CGFloat = 1
-            let labelsHeight: CGFloat = pageHeight - chartHeight - axisThickness
-            let totalSpacing = barSpacing * max(0, CGFloat(chartData.count - 1))
-            let availableWidth = geometry.size.width - totalSpacing
-            let barWidth = chartData.isEmpty ? 0 : max(0, availableWidth / CGFloat(chartData.count))
-
-            VStack(spacing: 0) {
-                // Bars area aligned to bottom of chart
-                HStack(spacing: barSpacing) {
-                    ForEach(chartData, id: \.id) { datum in
-                        BarItemView(
-                            datum: datum,
-                            selectedDate: $selectedDate,
-                            maxValue: maxValue,
-                            barWidth: barWidth,
-                            calendar: calendar
-                        )
+        .onChange(of: selectedMonth) { _, _ in
+            // 切换月份时，月视图滚动到该月末（或今天）
+            if viewMode == .month { xScrollPosition = monthOverallRange.end }
+        }
+        // 周滚动吸附：在横向滚动停止后，将位置吸附到最近的周起点
+        .onChange(of: xScrollPosition) { _, newValue in
+            guard viewMode == .week else { return }
+            snapWorkItem?.cancel()
+            let scheduledAt = Date()
+            lastScrollEventAt = scheduledAt
+            let work = DispatchWorkItem {
+                if lastScrollEventAt == scheduledAt {
+                    var target = calendar.startOfWeek(for: newValue)
+                    // clamp 到合法范围（保证整周可见）
+                    let minStart = weekOverallRange.start
+                    let maxStart = calendar.date(byAdding: .day, value: -6, to: weekOverallRange.end) ?? weekOverallRange.end
+                    if target < minStart { target = minStart }
+                    if target > maxStart { target = maxStart }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        xScrollPosition = target
                     }
                 }
-                .frame(height: chartHeight, alignment: .bottom)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-
-                // X Axis line
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .frame(height: axisThickness)
-
-                // Date labels aligned under the bars (format: M/d)
-                HStack(spacing: barSpacing) {
-                    ForEach(chartData, id: \.id) { datum in
-                        let isToday = calendar.isDateInToday(datum.date)
-                        let isSelected = selectedDate != nil && calendar.isDate(datum.date, inSameDayAs: selectedDate!)
-                        
-                        Text(formatDateLabel(datum.date))
-                            .font(.system(size: 10, weight: isSelected ? .bold : (isToday ? .semibold : .regular)))
-                            .foregroundColor(isSelected ? .primary : (isToday ? .primary : .secondary))
-                            .frame(width: barWidth)
-                    }
-                }
-                .frame(height: labelsHeight)
             }
+            snapWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
         }
-        .frame(height: 200)
     }
 }
 
-// MARK: - BarItemView
-struct BarItemView: View {
-    let datum: ScrollableBarChartView.DayDatum
-    @Binding var selectedDate: Date?
-    let maxValue: Double
-    let barWidth: CGFloat
-    let calendar: Calendar
-    
-    private var isToday: Bool {
-        calendar.isDateInToday(datum.date)
+// MARK: - Swift Charts Implementation
+
+private extension ScrollableBarChartView {
+    @ViewBuilder
+    func SwiftChartsBar() -> some View {
+        let overallRange = (viewMode == .week) ? weekOverallRange : monthOverallRange
+        if viewMode == .week {
+            WeekChart(data: weekOverallData, range: overallRange)
+        } else {
+            MonthChart(data: monthlyPage(for: selectedMonth ?? Date()), range: overallRange)
+        }
     }
-    
-    private var isSelected: Bool {
-        guard let selectedDate = selectedDate else { return false }
-        return calendar.isDate(datum.date, inSameDayAs: selectedDate)
+
+    @ViewBuilder
+    private func WeekChart(data: [DayDatum], range: (start: Date, end: Date)) -> some View {
+        let yMax = calculateMaxValue(for: data)
+        let baseChart = createBaseChart(data: data)
+        let configuredChart = configureChart(baseChart, yMax: yMax, range: range)
+        let scrollableChart = configureScrolling(configuredChart)
+        addSelectionHandlers(scrollableChart)
     }
-    
-    var body: some View {
-        // Two-column bars per day (expense left, income right)
-        let maxBarHeight: CGFloat = 160
-        let innerSpacing: CGFloat = min(4, barWidth * 0.25)
-        let halfWidth: CGFloat = max(1, (barWidth - innerSpacing) / 2)
-        let expenseRatio = maxValue > 0 ? datum.expense / maxValue : 0
-        let incomeRatio  = maxValue > 0 ? datum.income  / maxValue : 0
-        let expenseHeight = max(4, CGFloat(expenseRatio) * maxBarHeight)
-        let incomeHeight  = max(4, CGFloat(incomeRatio)  * maxBarHeight)
-        
-        // Keep existing color logic (selected > today > normal)
-        let expenseColor: Color = isSelected ? Color.red.opacity(0.9) : (isToday ? Color.red.opacity(0.7) : Color.red.opacity(0.5))
-        let incomeColor: Color  = isSelected ? Color.blue.opacity(0.9) : (isToday ? Color.blue.opacity(0.7) : Color.blue.opacity(0.5))
-        
-        return HStack(spacing: innerSpacing) {
-            // Expense (left)
-            ZStack(alignment: .bottom) {
-                if datum.expense > 0 {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(expenseColor)
-                        .frame(width: halfWidth, height: expenseHeight)
-                } else {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: halfWidth, height: 4)
+
+    private func calculateMaxValue(for data: [DayDatum]) -> Double {
+        let expenseValues = data.map { $0.expense }
+        let incomeValues = data.map { $0.income }
+        let maxExpense: Double = expenseValues.max() ?? 0
+        let maxIncome: Double = incomeValues.max() ?? 0
+        let maxValue = max(maxExpense, maxIncome)
+        return max(maxValue, 1)
+    }
+
+    private func createBaseChart(data: [DayDatum]) -> some View {
+        let barContent = barMarks(for: data)
+        let selectionContent = selectionMark()
+        return Chart {
+            barContent
+            selectionContent
+        }
+    }
+
+    private func configureChart<V: View>(_ chart: V, yMax: Double, range: (start: Date, end: Date)) -> some View {
+        chart
+            .chartLegend(.hidden)
+            .chartYScale(domain: 0...yMax)
+            .chartXScale(domain: range.start...range.end)
+            .chartXAxis { dayAxisMarks() }
+    }
+
+    private func configureScrolling<V: View>(_ chart: V) -> some View {
+        chart
+            .chartScrollableAxes(.horizontal)
+            .chartScrollTargetBehavior(.valueAligned(unit: 1))
+            .chartXVisibleDomain(length: 60 * 60 * 24 * 7)
+            .chartXSelection(value: $xSelection)
+            .chartScrollPosition(x: $xScrollPosition)
+    }
+
+    private func addSelectionHandlers<V: View>(_ chart: V) -> some View {
+        chart
+            .onChange(of: xSelection) { _, newValue in
+                if let date = newValue {
+                    selectedDate = calendar.startOfDay(for: date)
                 }
             }
-            .frame(width: halfWidth, height: maxBarHeight, alignment: .bottom)
-            
-            // Income (right)
-            ZStack(alignment: .bottom) {
-                if datum.income > 0 {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(incomeColor)
-                        .frame(width: halfWidth, height: incomeHeight)
-                } else {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: halfWidth, height: 4)
-                }
+            .onChange(of: selectedDate) { _, newValue in
+                xSelection = newValue
             }
-            .frame(width: halfWidth, height: maxBarHeight, alignment: .bottom)
-        }
-        .frame(width: barWidth, height: maxBarHeight, alignment: .bottom)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if isSelected {
-                selectedDate = nil
-            } else {
-                selectedDate = datum.date
+    }
+
+    @ViewBuilder
+    private func MonthChart(data: [DayDatum], range: (start: Date, end: Date)) -> some View {
+        let yMax = calculateMaxValue(for: data)
+        let baseChart = createBaseChart(data: data)
+        let configuredChart = configureChart(baseChart, yMax: yMax, range: range)
+        let selectableChart = addMonthSelection(configuredChart)
+        addSelectionHandlers(selectableChart)
+    }
+
+    private func addMonthSelection<V: View>(_ chart: V) -> some View {
+        chart.chartXSelection(value: $xSelection)
+    }
+
+    private func dayAxisMarks() -> some AxisContent {
+        AxisMarks(values: .stride(by: .day)) { value in
+            AxisGridLine().foregroundStyle(Color(.systemGray5))
+            AxisTick().foregroundStyle(Color(.systemGray4))
+            AxisValueLabel {
+                let date = value.as(Date.self)
+                let label = date.map { DateFormatter.onlyDay.string(from: $0) } ?? ""
+                let isToday = date.map { calendar.isDateInToday($0) } ?? false
+                let selected = date.flatMap { d in selectedDate.map { calendar.isDate(d, inSameDayAs: $0) } } ?? false
+                let weight: Font.Weight = selected ? .bold : (isToday ? .semibold : .regular)
+                let color: Color = (selected || isToday) ? .primary : .secondary
+                Text(label).font(.system(size: 10, weight: weight)).foregroundColor(color)
             }
         }
-        .accessibilityLabel("\(formatDate(datum.date))")
-        .accessibilityValue("支出: \(String(format: "%.2f", datum.expense)), 收入: \(String(format: "%.2f", datum.income))")
     }
-    
-    private func formatDate(_ date: Date) -> String {
-        DateFormatter.monthDayChinese.string(from: date)
-    }
-    
-}
 
-// MARK: - Y Axis + Gridlines
-struct YAxisView: View {
-    let maxValue: Double
-    let tickCount: Int
-    
-    private func axisLabel(_ value: Double) -> String {
-        let nf = NumberFormatter()
-        nf.numberStyle = .decimal
-        nf.maximumFractionDigits = 0
-        let text = nf.string(from: NSNumber(value: max(0, value))) ?? "0"
-        return "¥" + text
+    @ChartContentBuilder
+    private func barMarks(for data: [DayDatum]) -> some ChartContent {
+        expenseBarMarks(for: data)
+        incomeBarMarks(for: data)
     }
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            // Vertical baseline on the LEFT of numbers
-            Rectangle()
-                .fill(Color(.systemGray5))
-                .frame(width: 1)
-                .frame(maxHeight: .infinity)
 
-            // Tick labels stacked vertically
-            VStack(spacing: 0) {
-                ForEach(0...tickCount, id: \.self) { i in
-                    let value = maxValue * Double(tickCount - i) / Double(tickCount)
-                    HStack {
-                        Text(axisLabel(value))
-                            .font(.system(size: 10))
+    @ChartContentBuilder
+    private func expenseBarMarks(for data: [DayDatum]) -> some ChartContent {
+        ForEach(data, id: \.id) { day in
+            let style = barColor(type: .expense, day: day)
+            BarMark(x: .value("日期", day.date), y: .value("金额", day.expense))
+                .position(by: .value("类型", "支出"))
+                .foregroundStyle(style)
+                .cornerRadius(4)
+        }
+    }
+
+    @ChartContentBuilder
+    private func incomeBarMarks(for data: [DayDatum]) -> some ChartContent {
+        ForEach(data, id: \.id) { day in
+            let style = barColor(type: .income, day: day)
+            BarMark(x: .value("日期", day.date), y: .value("金额", day.income))
+                .position(by: .value("类型", "收入"))
+                .foregroundStyle(style)
+                .cornerRadius(4)
+        }
+    }
+
+    @ChartContentBuilder
+    private func selectionMark() -> some ChartContent {
+        if let sel = xSelection {
+            selectionRuleMark(for: sel)
+        }
+    }
+
+    @ChartContentBuilder
+    private func selectionRuleMark(for date: Date) -> some ChartContent {
+        let exp = store.dailyExpense(for: date)
+        let inc = store.dailyIncome(for: date)
+        let lineStyle = StrokeStyle(lineWidth: 1)
+        let foregroundColor = Color(.systemGray3)
+
+        RuleMark(x: .value("选中", date))
+            .lineStyle(lineStyle)
+            .foregroundStyle(foregroundColor)
+            .annotation(position: .top) {
+                ChartTooltipView(date: date, expense: exp, income: inc)
+            }
+    }
+
+    struct ChartTooltipView: View {
+        let date: Date
+        let expense: Double
+        let income: Double
+        var body: some View {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(DateFormatter.monthDayChinese.string(from: date))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                HStack(spacing: 10) {
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.red.opacity(0.8)).frame(width: 6, height: 6)
+                        Text(expense.currencyFormattedTwoDecimal)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    if i < tickCount { Spacer(minLength: 0) }
+                    HStack(spacing: 4) {
+                        Circle().fill(Color.blue.opacity(0.8)).frame(width: 6, height: 6)
+                        Text(income.currencyFormattedTwoDecimal)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
-        }
-        .padding(.leading, 2)
-    }
-}
-
-struct YAxisGridLines: View {
-    let tickCount: Int
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Draw gridlines for tick levels above baseline to avoid double-drawing X-axis
-            ForEach(0..<tickCount, id: \.self) { i in
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .frame(height: 1)
-                Spacer(minLength: 0)
-            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.thinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(.separator), lineWidth: 0.5)
+                    )
+            )
+            .shadow(color: Color.white, radius: 3, x: 0, y: 1)
         }
     }
-}
 
-// MARK: - Individual Bar Components
-struct IncomeBarView: View {
-    let income: Double
-    let maxValue: Double
-    let isToday: Bool
-    let isSelected: Bool
-    
-    private var barHeight: CGFloat {
-        let ratio = maxValue > 0 ? income / maxValue : 0
-        return max(2, ratio * 75) // Income占上半部分
-    }
-    
-    private var fillColor: Color {
-        if isSelected {
-            return Color.blue.opacity(0.9)
-        } else if isToday {
-            return Color.blue.opacity(0.7)
-        } else {
-            return Color.blue.opacity(0.5)
-        }
-    }
-    
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(fillColor)
-            .frame(height: barHeight)
+    enum BarType { case income, expense }
+
+    func barColor(type: BarType, day: DayDatum) -> Color {
+        let isToday = calendar.isDateInToday(day.date)
+        let isSelected = selectedDate.map { calendar.isDate(day.date, inSameDayAs: $0) } ?? false
+        let base: Color = (type == .expense) ? .red : .blue
+        let opacity: Double = isSelected ? 0.9 : (isToday ? 0.7 : 0.5)
+        return base.opacity(opacity)
     }
 }
 
-struct ExpenseBarView: View {
-    let expense: Double
-    let maxValue: Double
-    let isToday: Bool
-    let isSelected: Bool
-    
-    private var barHeight: CGFloat {
-        let ratio = maxValue > 0 ? expense / maxValue : 0
-        return max(2, ratio * 75) // Expense占下半部分
-    }
-    
-    private var fillColor: Color {
-        if isSelected {
-            return Color.red.opacity(0.9)
-        } else if isToday {
-            return Color.red.opacity(0.7)
-        } else {
-            return Color.red.opacity(0.5)
-        }
-    }
-    
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(fillColor)
-            .frame(height: barHeight)
-    }
-}
-
-struct EmptyBarView: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(Color.gray.opacity(0.2))
-            .frame(height: 2)
-    }
-}
-
+// Note: Legacy manual bar components removed due to migration to Swift Charts.
