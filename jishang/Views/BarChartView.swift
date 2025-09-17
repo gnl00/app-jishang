@@ -31,9 +31,8 @@ struct ScrollableBarChartView: View {
     @State private var xSelection: Date? = nil
     // iOS17 的横向滚动位置（必须为非可选类型，单位与 X 轴 Plottable 一致，这里是 Date）
     @State private var xScrollPosition: Date = Date()
-    // 周滚动吸附：防抖定时器与时间戳（用于判断滚动结束）
-    @State private var lastScrollEventAt: Date = .distantPast
-    @State private var snapWorkItem: DispatchWorkItem?
+    // 周视图分页（TabView）当前页索引：0=最早，maxWeeksBack=最新
+    @State private var weekPageIndex: Int = 0
     private let maxWeeksBack: Int = 4 // 最多查看前四周
     private var calendar: Calendar { Calendar.current }
 
@@ -117,7 +116,6 @@ struct ScrollableBarChartView: View {
         VStack(spacing: 12) {
             SwiftChartsBar()
                 .frame(height: 200)
-            // 页脚：提示
             HStack {
                 Text(viewMode == .week ? "横向滚动查看上/下周（最多前四周）" : "展示当月从 1 日至今天")
                     .font(.system(size: 12))
@@ -127,39 +125,42 @@ struct ScrollableBarChartView: View {
         }
         .onAppear {
             if let sel = selectedDate { xSelection = sel } else { xSelection = calendar.startOfDay(for: Date()) }
-            // 初始将可见窗口靠近整体域的末端（最新一周 / 当月末）
-            xScrollPosition = (viewMode == .week) ? weekOverallRange.end : monthOverallRange.end
+            // 初始定位：周视图对齐到“周起点”，月视图到“该月末/今天”
+            if viewMode == .week {
+                let anchor = selectedDate ?? weekOverallRange.end
+                xScrollPosition = calendar.startOfWeek(for: anchor)
+                // 初始化周分页索引：按 oldest->newest 排列，默认指向包含 anchor 的那页
+                weekPageIndex = initialWeekPageIndex(anchor: anchor)
+            } else {
+                xScrollPosition = monthOverallRange.end
+            }
         }
         .onChange(of: viewMode) { _, _ in
             xSelection = selectedDate ?? calendar.startOfDay(for: Date())
-            xScrollPosition = (viewMode == .week) ? weekOverallRange.end : monthOverallRange.end
+            if viewMode == .week {
+                let anchor = selectedDate ?? weekOverallRange.end
+                xScrollPosition = calendar.startOfWeek(for: anchor)
+                weekPageIndex = initialWeekPageIndex(anchor: anchor)
+            } else {
+                xScrollPosition = monthOverallRange.end
+            }
         }
         .onChange(of: selectedMonth) { _, _ in
             // 切换月份时，月视图滚动到该月末（或今天）
             if viewMode == .month { xScrollPosition = monthOverallRange.end }
         }
-        // 周滚动吸附：在横向滚动停止后，将位置吸附到最近的周起点
-        .onChange(of: xScrollPosition) { _, newValue in
+        .onChange(of: weekPageIndex) { _, _ in
+            // 周分页切换时，如果当前选中的日期不在新页范围内，则清除选中，避免显示跨页的 tooltip
             guard viewMode == .week else { return }
-            snapWorkItem?.cancel()
-            let scheduledAt = Date()
-            lastScrollEventAt = scheduledAt
-            let work = DispatchWorkItem {
-                if lastScrollEventAt == scheduledAt {
-                    var target = calendar.startOfWeek(for: newValue)
-                    // clamp 到合法范围（保证整周可见）
-                    let minStart = weekOverallRange.start
-                    let maxStart = calendar.date(byAdding: .day, value: -6, to: weekOverallRange.end) ?? weekOverallRange.end
-                    if target < minStart { target = minStart }
-                    if target > maxStart { target = maxStart }
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        xScrollPosition = target
-                    }
-                }
+            let pages = weeklyPages()
+            guard weekPageIndex >= 0 && weekPageIndex < pages.count else { return }
+            let r = pages[weekPageIndex].range
+            if let sel = xSelection {
+                let d = calendar.startOfDay(for: sel)
+                if d < r.start || d > r.end { xSelection = nil }
             }
-            snapWorkItem = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
         }
+        // 采用 .paging 内置行为，无需手写吸附
     }
 }
 
@@ -178,11 +179,25 @@ private extension ScrollableBarChartView {
 
     @ViewBuilder
     private func WeekChart(data: [DayDatum], range: (start: Date, end: Date)) -> some View {
-        let yMax = calculateMaxValue(for: data)
-        let baseChart = createBaseChart(data: data)
-        let configuredChart = configureChart(baseChart, yMax: yMax, range: range)
-        let scrollableChart = configureScrolling(configuredChart)
-        addSelectionHandlers(scrollableChart)
+        // 使用 TabView 做 5 周分页：oldest -> newest；默认定位到包含 anchor 的页
+        let pages = weeklyPages()
+        let yMax = calculateMaxValue(for: pages.flatMap { $0.data })
+        TabView(selection: $weekPageIndex) {
+            ForEach(0..<pages.count, id: \.self) { idx in
+                let page = pages[idx]
+                let baseChart = createBaseChart(data: page.data)
+                let ticks = (0...6).compactMap { calendar.date(byAdding: .day, value: $0, to: page.range.start) }
+                // 扩展 X 轴 domain 两侧各 12 小时，避免首尾刻度/标签被边界压缩
+                let startPad = calendar.date(byAdding: .hour, value: -12, to: page.range.start) ?? page.range.start
+                let endPad = calendar.date(byAdding: .hour, value: 12, to: page.range.end) ?? page.range.end
+                let configuredChart = configureChart(baseChart, yMax: yMax, range: (startPad, endPad), xAxisDays: ticks)
+                let selectable = addMonthSelection(configuredChart) // 复用选择绑定
+                addSelectionHandlers(selectable)
+                    .tag(idx)
+                    .frame(height: 200)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
     }
 
     private func calculateMaxValue(for data: [DayDatum]) -> Double {
@@ -203,18 +218,50 @@ private extension ScrollableBarChartView {
         }
     }
 
-    private func configureChart<V: View>(_ chart: V, yMax: Double, range: (start: Date, end: Date)) -> some View {
+    // 构建 5 周分页（oldest -> newest），每页 7 天；与 selectedMonth 无关
+    private func weeklyPages() -> [(data: [DayDatum], range: (start: Date, end: Date))] {
+        let today = calendar.startOfDay(for: Date())
+        let startOfThisWeek = calendar.startOfWeek(for: today)
+        let earliest = calendar.date(byAdding: .day, value: -7 * maxWeeksBack, to: startOfThisWeek) ?? startOfThisWeek
+        var pages: [(data: [DayDatum], range: (start: Date, end: Date))] = []
+        for offset in 0...maxWeeksBack { // oldest -> newest
+            let start = calendar.date(byAdding: .day, value: 7 * offset, to: earliest) ?? earliest
+            let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+            pages.append((data: buildDailySeries(from: start, to: end), range: (start, end)))
+        }
+        return pages
+    }
+
+    // 根据 anchor（selectedDate 或 today）计算初始周分页索引
+    private func initialWeekPageIndex(anchor: Date) -> Int {
+        let anchorWeekStart = calendar.startOfWeek(for: anchor)
+        let today = calendar.startOfDay(for: Date())
+        let startOfThisWeek = calendar.startOfWeek(for: today)
+        let earliest = calendar.date(byAdding: .day, value: -7 * maxWeeksBack, to: startOfThisWeek) ?? startOfThisWeek
+        let days = calendar.dateComponents([.day], from: earliest, to: anchorWeekStart).day ?? (7 * maxWeeksBack)
+        let index = max(0, min(maxWeeksBack, days / 7))
+        return index
+    }
+
+    private func configureChart<V: View>(_ chart: V, yMax: Double, range: (start: Date, end: Date), xAxisDays: [Date]? = nil) -> some View {
         chart
             .chartLegend(.hidden)
             .chartYScale(domain: 0...yMax)
             .chartXScale(domain: range.start...range.end)
-            .chartXAxis { dayAxisMarks() }
+            // 为避免首尾两天的柱贴边，给绘图区添加左右内边距
+            .chartPlotStyle { plot in
+                plot.padding(.leading, 12).padding(.trailing, 12)
+            }
+            .chartXAxis { dayAxisMarks(days: xAxisDays) }
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
     }
 
     private func configureScrolling<V: View>(_ chart: V) -> some View {
         chart
             .chartScrollableAxes(.horizontal)
-            .chartScrollTargetBehavior(.valueAligned(unit: 1))
+            .chartScrollTargetBehavior(.paging)
             .chartXVisibleDomain(length: 60 * 60 * 24 * 7)
             .chartXSelection(value: $xSelection)
             .chartScrollPosition(x: $xScrollPosition)
@@ -236,7 +283,10 @@ private extension ScrollableBarChartView {
     private func MonthChart(data: [DayDatum], range: (start: Date, end: Date)) -> some View {
         let yMax = calculateMaxValue(for: data)
         let baseChart = createBaseChart(data: data)
-        let configuredChart = configureChart(baseChart, yMax: yMax, range: range)
+        // 轻度扩展 X 轴 domain，避免最后一天刻度被边界压缩（对月视图也有帮助）
+        let startPad = calendar.date(byAdding: .hour, value: -12, to: range.start) ?? range.start
+        let endPad = calendar.date(byAdding: .hour, value: 12, to: range.end) ?? range.end
+        let configuredChart = configureChart(baseChart, yMax: yMax, range: (startPad, endPad), xAxisDays: nil)
         let selectableChart = addMonthSelection(configuredChart)
         addSelectionHandlers(selectableChart)
     }
@@ -245,18 +295,34 @@ private extension ScrollableBarChartView {
         chart.chartXSelection(value: $xSelection)
     }
 
-    private func dayAxisMarks() -> some AxisContent {
-        AxisMarks(values: .stride(by: .day)) { value in
-            AxisGridLine().foregroundStyle(Color(.systemGray5))
-            AxisTick().foregroundStyle(Color(.systemGray4))
-            AxisValueLabel {
-                let date = value.as(Date.self)
-                let label = date.map { DateFormatter.onlyDay.string(from: $0) } ?? ""
-                let isToday = date.map { calendar.isDateInToday($0) } ?? false
-                let selected = date.flatMap { d in selectedDate.map { calendar.isDate(d, inSameDayAs: $0) } } ?? false
-                let weight: Font.Weight = selected ? .bold : (isToday ? .semibold : .regular)
-                let color: Color = (selected || isToday) ? .primary : .secondary
-                Text(label).font(.system(size: 10, weight: weight)).foregroundColor(color)
+    private func dayAxisMarks(days: [Date]? = nil) -> some AxisContent {
+        if let explicitDays = days {
+            AxisMarks(values: explicitDays) { value in
+                AxisGridLine().foregroundStyle(Color(.systemGray5))
+                AxisTick().foregroundStyle(Color(.systemGray4))
+                AxisValueLabel {
+                    let date = value.as(Date.self)
+                    let label = date.map { DateFormatter.onlyDay.string(from: $0) } ?? ""
+                    let isToday = date.map { calendar.isDateInToday($0) } ?? false
+                    let selected = date.flatMap { d in selectedDate.map { calendar.isDate(d, inSameDayAs: $0) } } ?? false
+                    let weight: Font.Weight = selected ? .bold : (isToday ? .semibold : .regular)
+                    let color: Color = (selected || isToday) ? .primary : .secondary
+                    Text(label).font(.system(size: 10, weight: weight)).foregroundColor(color)
+                }
+            }
+        } else {
+            AxisMarks(values: .stride(by: .day)) { value in
+                AxisGridLine().foregroundStyle(Color(.systemGray5))
+                AxisTick().foregroundStyle(Color(.systemGray4))
+                AxisValueLabel {
+                    let date = value.as(Date.self)
+                    let label = date.map { DateFormatter.onlyDay.string(from: $0) } ?? ""
+                    let isToday = date.map { calendar.isDateInToday($0) } ?? false
+                    let selected = date.flatMap { d in selectedDate.map { calendar.isDate(d, inSameDayAs: $0) } } ?? false
+                    let weight: Font.Weight = selected ? .bold : (isToday ? .semibold : .regular)
+                    let color: Color = (selected || isToday) ? .primary : .secondary
+                    Text(label).font(.system(size: 10, weight: weight)).foregroundColor(color)
+                }
             }
         }
     }
@@ -339,7 +405,7 @@ private extension ScrollableBarChartView {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(.thinMaterial)
+                    .fill(.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color(.separator), lineWidth: 0.5)
