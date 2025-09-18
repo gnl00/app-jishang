@@ -133,7 +133,9 @@ struct ScrollableBarChartView: View {
             initializeSelection()
         }
         .onChange(of: viewMode) { _, _ in
-            initializeSelection()
+            withAnimation(.easeInOut(duration: 0.5)) {
+                initializeSelection()
+            }
         }
         .onChange(of: selectedDate) { _, newValue in
             if viewMode == .week {
@@ -206,8 +208,18 @@ private extension ScrollableBarChartView {
     func SwiftChartsBar() -> some View {
         if viewMode == .week {
             WeekChart(data: currentWeekData, range: currentWeekRange)
+                .id("weekChart")
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9).combined(with: .move(edge: .leading)).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .move(edge: .trailing)).combined(with: .opacity)
+                ))
         } else {
             MonthChart(data: monthlyPage(for: selectedMonth ?? Date()), range: monthOverallRange)
+                .id("monthChart")
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.9).combined(with: .move(edge: .trailing)).combined(with: .opacity),
+                    removal: .scale(scale: 0.9).combined(with: .move(edge: .leading)).combined(with: .opacity)
+                ))
         }
     }
 
