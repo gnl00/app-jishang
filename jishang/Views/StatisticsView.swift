@@ -66,11 +66,11 @@ struct StatisticsView: View {
                     // Cumulative data cards
                     CumulativeDataCardsView(store: transactionStore, timeFilter: timeRangeFilter)
 
-                    // Monthly comparison analysis
-                    MonthlyComparisonView(store: transactionStore)
-
                     // Net worth trend chart
                     NetWorthTrendView(store: transactionStore)
+                    
+                    // Monthly comparison analysis
+                    MonthlyComparisonView(store: transactionStore)
 
                     // Monthly performance ranking
                     MonthlyRankingView(store: transactionStore)
@@ -794,7 +794,7 @@ struct MonthlyRankingView: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header - 统一样式
             HStack {
-                Text("🎯 月度表现")
+                Text("🧩 月度表现")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.primary)
                 Spacer()
