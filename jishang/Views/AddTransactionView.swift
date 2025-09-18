@@ -509,7 +509,7 @@ struct AddTransactionView: View {
         let pageControl = UIPageControl.appearance()
 
         // 设置当前页面指示器颜色（选中状态）- 使用淡蓝色
-        pageControl.currentPageIndicatorTintColor = UIColor.blue.withAlphaComponent(0.6)
+        pageControl.currentPageIndicatorTintColor = UIColor.systemBlue.withAlphaComponent(0.6)
 
         // 设置非当前页面指示器颜色（未选中状态）- 使用浅灰色
         pageControl.pageIndicatorTintColor = UIColor.systemGray4
