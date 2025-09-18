@@ -499,41 +499,6 @@ struct ConsumptionTrendView: View {
                 )
             }
             
-            // 数据概览
-            HStack {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.green.opacity(0.6), Color.green.opacity(0.4)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: 8, height: 8)
-                    Text("收入: \(displayIncome.currencyFormattedTwoDecimal)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.red.opacity(0.6), Color.red.opacity(0.4)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: 8, height: 8)
-                    Text("支出: \(displayExpense.currencyFormattedTwoDecimal)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-            }
-            
             Spacer()
             
             // 图表区域 - 缩小高度
