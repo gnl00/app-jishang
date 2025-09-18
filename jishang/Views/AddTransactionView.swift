@@ -21,7 +21,20 @@ struct AddTransactionView: View {
     @State private var date = Date()
     @State private var showAddCategory = false
     @State private var isDeleteMode = false
+    @State private var includeTime = false // 是否包含时间选择
     @FocusState private var isAmountFocused: Bool
+    
+    // DatePicker 所使用的本地化环境（固定为中文显示）
+    private var datePickerLocale: Locale {
+        Locale(identifier: "zh_CN")
+    }
+    
+    private var datePickerCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = datePickerLocale
+        calendar.timeZone = TimeZone.current
+        return calendar
+    }
     
     init(store: TransactionStore, editingTransaction: Binding<Transaction?>, transactionType: TransactionType, initialTransaction: Transaction? = nil) {
         self.store = store
@@ -432,16 +445,34 @@ struct AddTransactionView: View {
     }
     
     private var dateSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("日期")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.secondary)
-            
-            DatePicker("选择日期", selection: $date, displayedComponents: .date)
-                .datePickerStyle(.compact)
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(includeTime ? "日期和时间" : "日期")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Toggle("包含时间", isOn: $includeTime)
+                    .labelsHidden()
+                    .scaleEffect(0.8)
+                    .changeEffect(.shine, value: includeTime)
+            }
+
+            DatePicker(
+                "选择日期",
+                selection: $date,
+                displayedComponents: includeTime ? [.date, .hourAndMinute] : [.date]
+            )
+            .datePickerStyle(.compact)
+            .id(includeTime) // 切换 includeTime 时重建组件，应用显示模式变化
+            .environment(\.locale, datePickerLocale)
+            .environment(\.calendar, datePickerCalendar)
+            .environment(\.timeZone, TimeZone.current)
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+            .transition(.movingParts.boing)
         }
         .transition(.slide.combined(with: .opacity))
     }
