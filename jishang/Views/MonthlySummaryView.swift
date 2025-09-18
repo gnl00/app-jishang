@@ -7,7 +7,6 @@
 //  Contains:
 //  - MonthlySummaryView: Monthly summary card for home page
 //  - MonthSwitcherView: Month switcher component
-//  - HeaderSectionView: Header with expand arrow
 //
 
 import SwiftUI
@@ -16,7 +15,6 @@ import Pow
 struct MonthlySummaryView: View {
     @ObservedObject var store: TransactionStore
     @State private var selectedPeriod = 0
-    @State private var isExpanded = false
     @State private var showDailyExpenseDetails = false
     
     private var selectedDate: Date {
@@ -40,107 +38,41 @@ struct MonthlySummaryView: View {
         currentMonthIncome - currentMonthExpense
     }
     
+    private var previousMonthDate: Date {
+        Calendar.current.date(byAdding: .month, value: -1, to: selectedDate) ?? selectedDate
+    }
+    
+    private var previousMonthBalance: Double {
+        let income = store.monthlyIncome(for: previousMonthDate)
+        let expense = store.monthlyExpense(for: previousMonthDate)
+        return income - expense
+    }
+    
+    private var balanceChange: Double {
+        balance - previousMonthBalance
+    }
+    
+    private var balanceChangePercent: Double? {
+        guard previousMonthBalance != 0 else { return nil }
+        return (balanceChange / abs(previousMonthBalance)) * 100
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Header - 简化设计，与SummaryCardsView呼应
-            HStack {
-                Text("月度总览")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                Button(action: {
-                    showDailyExpenseDetails = true
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chart.bar.fill")
-                            .font(.system(size: 12, weight: .medium))
-                        Text("详情")
-                            .font(.system(size: 14, weight: .medium))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(.secondary)
-                }
-            }
-            .padding(.bottom, 18)
-            
-            // 核心数据 - 三列平均分布，去除彩色背景
-            HStack(spacing: 0) {
-                // 收入
-                VStack(spacing: 6) {
-                    Text("收入")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    RollingNumberView(
-                        value: currentMonthIncome,
-                        font: .system(size: 18, weight: .bold, design: .rounded),
-                        textColor: .primary,
-                        prefix: "¥",
-                        showDecimals: false
-                    )
-                }
-                .frame(maxWidth: .infinity)
-                
-                // 分隔线
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .frame(width: 1, height: 35)
-                
-                // 支出
-                VStack(spacing: 6) {
-                    Text("支出")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    RollingNumberView(
-                        value: currentMonthExpense,
-                        font: .system(size: 18, weight: .bold, design: .rounded),
-                        textColor: .primary,
-                        prefix: "¥",
-                        showDecimals: false
-                    )
-                }
-                .frame(maxWidth: .infinity)
-                
-                // 分隔线
-                Rectangle()
-                    .fill(Color(.systemGray5))
-                    .frame(width: 1, height: 35)
-                
-                // 余额
-                VStack(spacing: 6) {
-                    Text("余额")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    RollingNumberView(
-                        value: balance,
-                        font: .system(size: 18, weight: .bold, design: .rounded),
-                        textColor: balance >= 0 ? .primary : Color(red: 0.8, green: 0.3, blue: 0.3),
-                        prefix: "¥",
-                        showDecimals: false
-                    )
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.bottom, 20)
-            
-            // 进度条 - 保持红绿配色与SummaryCardsView呼应
+        VStack(alignment: .leading, spacing: 9) {
+            headerSection
+            balanceHighlight
+            metricTiles
             RedGreenProgressView(
                 expense: currentMonthExpense,
                 balance: balance,
                 totalIncome: currentMonthIncome
             )
-            .padding(.bottom, 18)
-            
-            // 月份切换器 - 简化设计
-            MonthSwitcherView(selectedPeriod: $selectedPeriod)
+            // 暂时注释 DO NOT delete or update the line belove
+            // MonthSwitcherView(selectedPeriod: $selectedPeriod)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemBackground))
@@ -156,28 +88,148 @@ struct MonthlySummaryView: View {
     }
 }
 
-// MARK: - Header Section with Title and Expand Arrow
-struct HeaderSectionView: View {
-    @Binding var isExpanded: Bool
-    var onShowDetails: (() -> Void)? = nil
-    
-    var body: some View {
-        HStack(spacing: 12) {
+private extension MonthlySummaryView {
+    var headerSection: some View {
+        HStack {
             Text("月度总览")
-                .font(.system(size: 14, weight: .medium))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.primary)
-            
+
             Spacer()
-            
-            Button(action: {
-                onShowDetails?()
-            }) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.gray)
+
+            Button(action: { showDailyExpenseDetails = true }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("详情")
+                        .font(.system(size: 14, weight: .medium))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+    }
+
+    var balanceHighlight: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text("月度余额")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+
+                balanceTrendLabel
+
+                Spacer()
+            }
+
+            RollingNumberView(
+                value: balance,
+                font: .system(size: 28, weight: .bold, design: .rounded),
+                textColor: balance >= 0 ? .primary : Color(red: 0.8, green: 0.3, blue: 0.3),
+                prefix: "¥",
+                showDecimals: false,
+                digitWidth: 20,
+                decimalPointWidth: 12,
+                separatorWidth: 12,
+                currencyUnitWidth: 24
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    var metricTiles: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                metricTile(title: "收入", amount: currentMonthIncome, accent: .blue)
+                metricTile(title: "支出", amount: currentMonthExpense, accent: .red)
+            }
+
+            VStack(spacing: 6) {
+                metricTile(title: "收入", amount: currentMonthIncome, accent: .blue)
+                metricTile(title: "支出", amount: currentMonthExpense, accent: .red)
             }
         }
-        .padding(.vertical, 2)
+    }
+
+    func metricTile(title: String, amount: Double, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(accent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(accent.opacity(0.12))
+                )
+
+            RollingNumberView(
+                value: amount,
+                font: .system(size: 19, weight: .semibold, design: .rounded),
+                textColor: .primary.opacity(0.7),
+                prefix: "¥",
+                showDecimals: false,
+                digitWidth: 18,
+                decimalPointWidth: 10,
+                separatorWidth: 10,
+                currencyUnitWidth: 24
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private var balanceTrendData: (icon: String, color: Color, description: String)? {
+        guard balanceChange != 0 else { return nil }
+        let isPositive = balanceChange > 0
+        let icon = isPositive ? "arrow.up.right" : "arrow.down.right"
+        let color = isPositive ? Color.green : Color.red
+        let changeText = balanceChange.currencyFormattedInt
+
+        let description: String
+        if let percent = balanceChangePercent {
+            let formatted = String(format: "%+.1f%%", percent)
+            description = "\(changeText) (\(formatted))"
+        } else {
+            description = changeText
+        }
+
+        return (icon, color, description)
+    }
+
+    @ViewBuilder
+    var balanceTrendLabel: some View {
+        if let data = balanceTrendData {
+            HStack(spacing: 4) {
+                Image(systemName: data.icon)
+                Text(data.description)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(data.color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(data.color.opacity(0.12))
+            )
+        }
     }
 }
 
