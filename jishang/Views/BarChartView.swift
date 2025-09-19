@@ -244,7 +244,7 @@ private extension ScrollableBarChartView {
         .chartPlotStyle { plot in
             plot.padding(.leading, 12).padding(.trailing, 12)
         }
-        .chartXAxis { dayAxisMarks() }
+        .chartXAxis { dayAxisMarks(showLabels: true) }
         .chartYAxis {
             AxisMarks(position: .leading)
         }
@@ -310,7 +310,7 @@ private extension ScrollableBarChartView {
         .chartPlotStyle { plot in
             plot.padding(.leading, 12).padding(.trailing, 12)
         }
-        .chartXAxis { dayAxisMarks() }
+        .chartXAxis { dayAxisMarks(showLabels: false) }
         .chartYAxis {
             AxisMarks(position: .leading)
         }
@@ -335,18 +335,20 @@ private extension ScrollableBarChartView {
         }
     }
 
-    private func dayAxisMarks() -> some AxisContent {
+    private func dayAxisMarks(showLabels: Bool) -> some AxisContent {
         AxisMarks(values: .stride(by: .day)) { value in
             AxisGridLine().foregroundStyle(Color(.systemGray5))
             AxisTick().foregroundStyle(Color(.systemGray4))
-            AxisValueLabel {
-                let date = value.as(Date.self)
-                let label = date.map { DateFormatter.onlyDay.string(from: $0) } ?? ""
-                let isToday = date.map { calendar.isDateInToday($0) } ?? false
-                let selected = date.flatMap { d in selectedDate.map { calendar.isDate(d, inSameDayAs: $0) } } ?? false
-                let weight: Font.Weight = selected ? .bold : (isToday ? .semibold : .regular)
-                let color: Color = (selected || isToday) ? .primary : .secondary
-                Text(label).font(.system(size: 10, weight: weight)).foregroundColor(color)
+            if showLabels {
+                AxisValueLabel {
+                    let date = value.as(Date.self)
+                    let label = date.map { DateFormatter.onlyDay.string(from: $0) } ?? ""
+                    let isToday = date.map { calendar.isDateInToday($0) } ?? false
+                    let selected = date.flatMap { d in selectedDate.map { calendar.isDate(d, inSameDayAs: $0) } } ?? false
+                    let weight: Font.Weight = selected ? .bold : (isToday ? .semibold : .regular)
+                    let color: Color = (selected || isToday) ? .primary : .secondary
+                    Text(label).font(.system(size: 10, weight: weight)).foregroundColor(color)
+                }
             }
         }
     }
