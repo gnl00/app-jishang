@@ -115,8 +115,8 @@ private extension MonthlySummaryView {
     var balanceHighlight: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
-                Text("月度余额")
-                    .font(.system(size: 15, weight: .semibold))
+                Text("余额")
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primary)
 
                 balanceTrendLabel
