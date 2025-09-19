@@ -82,11 +82,10 @@ struct MonthlyStatisticsView: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(.primary)
                         Spacer()
+                        // 月份选择器
+                        MonthPickerView(selectedMonth: $selectedMonth, store: store)
                     }
                     .padding(.top)
-                    
-                    // 月份选择器
-                    MonthPickerView(selectedMonth: $selectedMonth, store: store)
                     
                     // 消费健康度仪表盘
                     HealthDashboardView(
@@ -238,7 +237,7 @@ struct HealthDashboardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("🎯 消费健康度仪表盘")
+            Text("☸️ 消费健康度仪表盘")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.primary)
             
@@ -840,6 +839,7 @@ struct SmartTipView: View {
             }
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(
