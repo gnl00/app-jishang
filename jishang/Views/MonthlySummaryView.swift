@@ -129,8 +129,8 @@ private extension MonthlySummaryView {
                 font: .system(size: 28, weight: .bold, design: .rounded),
                 textColor: balance >= 0 ? .primary : Color(red: 0.8, green: 0.3, blue: 0.3),
                 prefix: "¥",
-                showDecimals: false,
-                digitWidth: 20,
+                showDecimals: true,
+                digitWidth: 18,
                 decimalPointWidth: 12,
                 separatorWidth: 12,
                 currencyUnitWidth: 24
@@ -150,36 +150,30 @@ private extension MonthlySummaryView {
     var metricTiles: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
-                metricTile(title: "收入", amount: currentMonthIncome, accent: .blue)
-                metricTile(title: "支出", amount: currentMonthExpense, accent: .red)
+                metricTile(title: "收入", amount: currentMonthIncome, color: Color.blue.opacity(0.12), accent: .blue)
+                metricTile(title: "支出", amount: currentMonthExpense, color: Color.red.opacity(0.12), accent: .red)
             }
 
             VStack(spacing: 6) {
-                metricTile(title: "收入", amount: currentMonthIncome, accent: .blue)
-                metricTile(title: "支出", amount: currentMonthExpense, accent: .red)
+                metricTile(title: "收入", amount: currentMonthIncome, color: Color.blue.opacity(0.12), accent: .blue)
+                metricTile(title: "支出", amount: currentMonthExpense, color: Color.red.opacity(0.12), accent: .red)
             }
         }
     }
 
-    func metricTile(title: String, amount: Double, accent: Color) -> some View {
+    func metricTile(title: String, amount: Double, color: Color, accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(accent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(
-                    Capsule()
-                        .fill(accent.opacity(0.12))
-                )
+                .foregroundColor(accent.opacity(0.3))
 
             RollingNumberView(
                 value: amount,
                 font: .system(size: 19, weight: .semibold, design: .rounded),
-                textColor: .primary.opacity(0.7),
+                textColor: accent.opacity(0.7),
                 prefix: "¥",
-                showDecimals: false,
-                digitWidth: 18,
+                showDecimals: true,
+                digitWidth: 16,
                 decimalPointWidth: 10,
                 separatorWidth: 10,
                 currencyUnitWidth: 24
@@ -192,7 +186,11 @@ private extension MonthlySummaryView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color(.secondarySystemBackground))
+                .fill(color)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(accent.opacity(0.2), lineWidth: 1)
+                )
         )
     }
 
