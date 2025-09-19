@@ -87,6 +87,8 @@ struct MonthlyStatisticsView: View {
                     }
                     .padding(.top)
                     
+                    Spacer()
+                    
                     // 消费健康度仪表盘
                     HealthDashboardView(
                         income: currentMonthIncome,
