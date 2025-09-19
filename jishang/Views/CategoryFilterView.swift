@@ -489,24 +489,29 @@ struct MainFilterButton: View {
     let title: String
     let isSelected: Bool
     let namespace: Namespace.ID
+    // Customizable colors with sensible defaults
+    let selectedFill: Color = Color.primary
+    let selectedTextColor: Color = Color.white
+    let unselectedFill: Color = Color(.systemGray6)
+    let unselectedTextColor: Color = Color.primary
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(isSelected ? .white : .primary)
+                .foregroundColor(isSelected ? selectedTextColor : unselectedTextColor)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(
                     ZStack {
                         if isSelected {
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.primary)
+                                .fill(selectedFill)
                                 .matchedGeometryEffect(id: "mainBackground", in: namespace)
                         } else {
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(Color(.systemGray6))
+                                .fill(unselectedFill)
                         }
                     }
                 )
@@ -519,24 +524,29 @@ struct SubFilterButton: View {
     let title: String
     let isSelected: Bool
     let namespace: Namespace.ID
+    // Customizable colors with sensible defaults
+    let selectedFill: Color = Color(UIColor.systemFill.withAlphaComponent(0.8))
+    let selectedTextColor: Color = Color.white
+    let unselectedFill: Color = Color(.systemGray5)
+    let unselectedTextColor: Color = Color.secondary
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
+                .foregroundColor(isSelected ? selectedTextColor : unselectedTextColor)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     ZStack {
                         if isSelected {
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(UIColor.systemFill.withAlphaComponent(0.8)))
+                                .fill(selectedFill)
                                 .matchedGeometryEffect(id: "subBackground", in: namespace)
                         } else {
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemGray5))
+                                .fill(unselectedFill)
                         }
                     }
                 )
