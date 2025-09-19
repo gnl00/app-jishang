@@ -150,13 +150,13 @@ private extension MonthlySummaryView {
     var metricTiles: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
-                metricTile(title: "收入", amount: currentMonthIncome, color: Color.blue.opacity(0.12), accent: .blue)
-                metricTile(title: "支出", amount: currentMonthExpense, color: Color.red.opacity(0.12), accent: .red)
+                metricTile(title: "收入", amount: currentMonthIncome, color: Color.blue.opacity(0.1), accent: .blue)
+                metricTile(title: "支出", amount: currentMonthExpense, color: Color.red.opacity(0.1), accent: .red)
             }
 
             VStack(spacing: 6) {
-                metricTile(title: "收入", amount: currentMonthIncome, color: Color.blue.opacity(0.12), accent: .blue)
-                metricTile(title: "支出", amount: currentMonthExpense, color: Color.red.opacity(0.12), accent: .red)
+                metricTile(title: "收入", amount: currentMonthIncome, color: Color.blue.opacity(0.1), accent: .blue)
+                metricTile(title: "支出", amount: currentMonthExpense, color: Color.red.opacity(0.1), accent: .red)
             }
         }
     }
@@ -189,7 +189,7 @@ private extension MonthlySummaryView {
                 .fill(color)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(accent.opacity(0.2), lineWidth: 1)
+                        .stroke(accent.opacity(0.15), lineWidth: 1)
                 )
         )
     }
